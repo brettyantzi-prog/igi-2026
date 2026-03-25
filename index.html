@@ -14,14 +14,13 @@
   // PASTE YOUR FIREBASE CONFIG HERE (replace all values below)
   // ============================================================
   const firebaseConfig = {
-    apiKey: "AIzaSyBZQ9Jp117xXp9HLe-q_9lJ8ZXs5xZBXws",
-  authDomain: "golf-tournament-2025.firebaseapp.com",
-  databaseURL: "https://golf-tournament-2025-default-rtdb.firebaseio.com",
-  projectId: "golf-tournament-2025",
-  storageBucket: "golf-tournament-2025.firebasestorage.app",
-  messagingSenderId: "1060824673348",
-  appId: "1:1060824673348:web:f8714882de377bb44da011",
-  measurementId: "G-J9XWBBL8NY"
+    apiKey: "REPLACE_WITH_YOUR_API_KEY",
+    authDomain: "REPLACE_WITH_YOUR_AUTH_DOMAIN",
+    databaseURL: "REPLACE_WITH_YOUR_DATABASE_URL",
+    projectId: "REPLACE_WITH_YOUR_PROJECT_ID",
+    storageBucket: "REPLACE_WITH_YOUR_STORAGE_BUCKET",
+    messagingSenderId: "REPLACE_WITH_YOUR_MESSAGING_SENDER_ID",
+    appId: "REPLACE_WITH_YOUR_APP_ID"
   };
   // ============================================================
 
@@ -350,7 +349,7 @@ document.addEventListener('firebase-ready',()=>{
             b:Array.isArray(b.b)?b.b:Object.values(b.b||{})
           };
         }
-        if(data.pending&&data.pending[m.id]) pending[m.id]=data.pending[m.id];
+        // pending is intentionally NOT synced via Firebase - it's local UI state only
       });
     }
     dot.className='sync-dot live';
@@ -364,9 +363,8 @@ async function saveMatch(id){
   dot.className='sync-dot';
   try{
     await Promise.all([
-      window._fbSet('tournament/holes/'+id,   holes[id]),
-      window._fbSet('tournament/bonus/'+id,   bonusHoles[id]),
-      window._fbSet('tournament/pending/'+id, pending[id]),
+      window._fbSet('tournament/holes/'+id,  holes[id]),
+      window._fbSet('tournament/bonus/'+id,  bonusHoles[id]),
     ]);
     dot.className='sync-dot live';
   }catch(e){ dot.className='sync-dot error'; }
