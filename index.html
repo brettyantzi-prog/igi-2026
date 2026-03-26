@@ -14,14 +14,13 @@
   // PASTE YOUR FIREBASE CONFIG HERE (replace all values below)
   // ============================================================
   const firebaseConfig = {
-apiKey: "AIzaSyBZQ9Jp117xXp9HLe-q_9lJ8ZXs5xZBXws",
-  authDomain: "golf-tournament-2025.firebaseapp.com",
-  databaseURL: "https://golf-tournament-2025-default-rtdb.firebaseio.com",
-  projectId: "golf-tournament-2025",
-  storageBucket: "golf-tournament-2025.firebasestorage.app",
-  messagingSenderId: "1060824673348",
-  appId: "1:1060824673348:web:f8714882de377bb44da011",
-  measurementId: "G-J9XWBBL8NY"
+    apiKey: "REPLACE_WITH_YOUR_API_KEY",
+    authDomain: "REPLACE_WITH_YOUR_AUTH_DOMAIN",
+    databaseURL: "REPLACE_WITH_YOUR_DATABASE_URL",
+    projectId: "REPLACE_WITH_YOUR_PROJECT_ID",
+    storageBucket: "REPLACE_WITH_YOUR_STORAGE_BUCKET",
+    messagingSenderId: "REPLACE_WITH_YOUR_MESSAGING_SENDER_ID",
+    appId: "REPLACE_WITH_YOUR_APP_ID"
   };
   // ============================================================
 
@@ -207,6 +206,22 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .loading-spinner{width:32px;height:32px;border:2px solid rgba(232,196,74,.2);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
+/* EDIT MODE */
+.edit-btn{width:100%;padding:9px;background:transparent;border:1px solid rgba(232,196,74,.3);border-radius:8px;color:var(--gold);font-size:11px;cursor:pointer;transition:all .2s;font-family:'DM Sans',sans-serif;font-weight:600;margin-top:6px}
+.edit-btn:hover{background:rgba(232,196,74,.08)}
+.edit-btn.active{background:rgba(232,196,74,.12);border-color:var(--gold)}
+.edit-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(4px);z-index:400;display:flex;align-items:flex-end;justify-content:center;padding:0}
+.edit-modal{background:var(--green-mid);border:1px solid rgba(232,196,74,.3);border-top-left-radius:20px;border-top-right-radius:20px;padding:20px 20px 36px;width:100%;max-width:500px}
+.edit-modal-title{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--gold);letter-spacing:1px;margin-bottom:4px}
+.edit-modal-sub{font-size:11px;color:var(--gray);margin-bottom:16px}
+.edit-hole-result{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;margin-bottom:12px}
+.edit-bonus-row{display:flex;gap:8px;margin-bottom:16px}
+.edit-bonus-btn{flex:1;padding:9px;border-radius:8px;border:1.5px solid var(--orange);background:transparent;color:var(--orange);font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s}
+.edit-bonus-btn.on{background:var(--orange);color:var(--dark)}
+.edit-bonus-btn:disabled{opacity:.3;cursor:default;border-color:var(--gray);color:var(--gray)}
+.edit-bonus-btn.on:disabled{background:var(--gray);border-color:var(--gray)}
+.edit-close{width:100%;padding:12px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:10px;color:var(--white);font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
+
 /* PIN MODAL */
 .pin-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px}
 .pin-modal{background:var(--green-mid);border:1px solid var(--gold);border-radius:16px;padding:28px 24px;width:100%;max-width:300px;text-align:center}
@@ -230,6 +245,17 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
   <div class="loading-logo">⛳ Scramble Wars</div>
   <div class="loading-sub">Connecting to live scores...</div>
   <div class="loading-spinner"></div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="edit-overlay" id="editOverlay" style="display:none" onclick="closeEditModal(event)">
+  <div class="edit-modal" id="editModal">
+    <div class="edit-modal-title" id="editTitle">Edit Hole</div>
+    <div class="edit-modal-sub" id="editSub"></div>
+    <div class="edit-hole-result" id="editResultRow"></div>
+    <div class="edit-bonus-row" id="editBonusRow"></div>
+    <button class="edit-close" onclick="closeEdit()">Done</button>
+  </div>
 </div>
 
 <!-- PIN MODAL -->
@@ -321,6 +347,7 @@ const MAX_BONUS = 2;
 
 let holes={}, bonusHoles={}, pending={}, openPanels={};
 let activeDay=1, activeSection='leaderboard';
+let editMode={}; // tracks which matches are in edit mode
 
 ALL_MATCHES.forEach(m=>{
   holes[m.id]      = Array(18).fill(null);
@@ -567,15 +594,20 @@ function buildPanel(m,aUp,played,result,fmt){
   const h=holes[m.id], ba=bonusHoles[m.id].a, bb=bonusHoles[m.id].b, pb=pending[m.id];
   const next=result?-1:h.findIndex(x=>x===null);
 
-  // Hole grid
+  // Hole grid — tappable in edit mode
+  const inEdit=editMode[m.id];
   let grid='<div class="hole-grid">';
   for(let i=0;i<18;i++){
-    const v=h[i], voided=result&&i>=result.close;
+    const v=h[i], voided=result&&i>=result.close&&!inEdit;
     const aB=ba.includes(i), bB=bb.includes(i);
     let cls=voided?'voided':(v==='A'?'won-a':v==='B'?'won-b':v==='H'?'halved':'');
     const dot=(aB||bB)&&!voided?'<span class="bdot"></span>':'';
     const lbl=v==='A'?m.pairA.split('&')[0].trim().substring(0,3):v==='B'?m.pairB.split('&')[0].trim().substring(0,3):v==='H'?'½':'';
-    grid+=`<div class="hole-cell ${cls}"><span class="hnum">${i+1}</span><span class="hres">${lbl}</span>${dot}</div>`;
+    const clickable=inEdit&&v!==null;
+    const editStyle=clickable?'cursor:pointer;outline:2px solid rgba(232,196,74,.4);':'';
+    grid+=`<div class="hole-cell ${cls}" style="${editStyle}" ${clickable?`onclick="openEditHole('${m.id}',${i})"`:''}>
+      <span class="hnum">${i+1}</span><span class="hres">${lbl}</span>${dot}
+    </div>`;
   }
   grid+='</div>';
 
@@ -653,8 +685,10 @@ function buildPanel(m,aUp,played,result,fmt){
     </div>`;
   }
 
-  const undoHtml=played>0?`<button class="undo-btn" onclick="undoHole('${m.id}')">↩ Undo Last Hole</button>`:'';
-  return grid+bonusHtml+runHtml+actionHtml+undoHtml;
+  const inEditMode=editMode[m.id];
+  const undoHtml=played>0&&!inEditMode?`<button class="undo-btn" onclick="undoHole('${m.id}')">↩ Undo Last Hole</button>`:'';
+  const editBtnHtml=played>0?`<button class="edit-btn ${inEditMode?'active':''}" onclick="toggleEditMode('${m.id}')">${inEditMode?'✓ Done Editing':'✏️ Edit a Hole'}</button>`:'';
+  return grid+bonusHtml+runHtml+actionHtml+undoHtml+editBtnHtml;
 }
 
 // ═══════════════════════════════════════════
@@ -756,7 +790,83 @@ let pinUnlocked  = false;   // stays unlocked for the session once entered
 let pinBuffer    = '';
 let pinTarget    = null;    // match id waiting to be unlocked
 
-function togglePanel(id){
+function toggleEditMode(id){
+  editMode[id]=!editMode[id];
+  render();
+}
+
+function openEditHole(matchId, holeIdx){
+  const m=ALL_MATCHES.find(x=>x.id===matchId);
+  const h=holes[matchId][holeIdx];
+  const aBonus=bonusHoles[matchId].a.includes(holeIdx);
+  const bBonus=bonusHoles[matchId].b.includes(holeIdx);
+  const aUsed=bonusUsed(matchId,'a');
+  const bUsed=bonusUsed(matchId,'b');
+  // Can add bonus if not already on AND haven't used max (or already on this hole)
+  const aCanBonus=aBonus||(aUsed<MAX_BONUS);
+  const bCanBonus=bBonus||(bUsed<MAX_BONUS);
+
+  document.getElementById('editTitle').textContent=`Edit Hole ${holeIdx+1}`;
+  document.getElementById('editSub').textContent=`${m.pairA}  vs  ${m.pairB}`;
+
+  // Result buttons
+  document.getElementById('editResultRow').innerHTML=`
+    <button class="entry-btn btn-a ${h==='A'?'bonus-on':''}" onclick="editSetResult('${matchId}',${holeIdx},'A')">${m.pairA}</button>
+    <button class="entry-btn btn-half ${h==='H'?'bonus-on':''}" onclick="editSetResult('${matchId}',${holeIdx},'H')" style="padding:13px 10px">½<br>Halved</button>
+    <button class="entry-btn btn-b ${h==='B'?'bonus-on':''}" onclick="editSetResult('${matchId}',${holeIdx},'B')">${m.pairB}</button>
+  `;
+
+  // Bonus buttons
+  document.getElementById('editBonusRow').innerHTML=`
+    <button class="edit-bonus-btn ${aBonus?'on':''}" ${!aCanBonus?'disabled':''} onclick="editToggleBonus('${matchId}',${holeIdx},'a')">
+      🔥 ${m.pairA.split('&')[0].trim()} Bonus ${aBonus?'✓':''}
+    </button>
+    <button class="edit-bonus-btn ${bBonus?'on':''}" ${!bCanBonus?'disabled':''} onclick="editToggleBonus('${matchId}',${holeIdx},'b')">
+      🔥 ${m.pairB.split('&')[0].trim()} Bonus ${bBonus?'✓':''}
+    </button>
+  `;
+
+  // Store current edit context
+  document.getElementById('editOverlay').dataset.matchId=matchId;
+  document.getElementById('editOverlay').dataset.holeIdx=holeIdx;
+  document.getElementById('editOverlay').style.display='flex';
+}
+
+function editSetResult(matchId, holeIdx, result){
+  holes[matchId][holeIdx]=result;
+  // If changed to halved, remove bonuses for this hole
+  if(result==='H'){
+    bonusHoles[matchId].a=bonusHoles[matchId].a.filter(x=>x!==holeIdx);
+    bonusHoles[matchId].b=bonusHoles[matchId].b.filter(x=>x!==holeIdx);
+  }
+  saveMatch(matchId);
+  // Refresh the modal buttons to show new selection
+  openEditHole(matchId, holeIdx);
+  render();
+}
+
+function editToggleBonus(matchId, holeIdx, side){
+  const arr=bonusHoles[matchId][side];
+  const hasBonus=arr.includes(holeIdx);
+  const used=bonusUsed(matchId,side);
+  if(!hasBonus && used>=MAX_BONUS) return; // no bonus left
+  if(hasBonus){
+    bonusHoles[matchId][side]=arr.filter(x=>x!==holeIdx);
+  } else {
+    bonusHoles[matchId][side].push(holeIdx);
+  }
+  saveMatch(matchId);
+  openEditHole(matchId, holeIdx);
+  render();
+}
+
+function closeEditModal(e){
+  if(e.target===document.getElementById('editOverlay')) closeEdit();
+}
+
+function closeEdit(){
+  document.getElementById('editOverlay').style.display='none';
+}
   // If opening and not yet unlocked, show PIN modal
   if(!openPanels[id] && !pinUnlocked){
     pinTarget = id;
