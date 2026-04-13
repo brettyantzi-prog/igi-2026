@@ -14,14 +14,13 @@
   // PASTE YOUR FIREBASE CONFIG HERE (replace all values below)
   // ============================================================
   const firebaseConfig = {
-apiKey: "AIzaSyBZQ9Jp117xXp9HLe-q_9lJ8ZXs5xZBXws",
-  authDomain: "golf-tournament-2025.firebaseapp.com",
-  databaseURL: "https://golf-tournament-2025-default-rtdb.firebaseio.com",
-  projectId: "golf-tournament-2025",
-  storageBucket: "golf-tournament-2025.firebasestorage.app",
-  messagingSenderId: "1060824673348",
-  appId: "1:1060824673348:web:f8714882de377bb44da011",
-  measurementId: "G-J9XWBBL8NY"
+    apiKey: "REPLACE_WITH_YOUR_API_KEY",
+    authDomain: "REPLACE_WITH_YOUR_AUTH_DOMAIN",
+    databaseURL: "REPLACE_WITH_YOUR_DATABASE_URL",
+    projectId: "REPLACE_WITH_YOUR_PROJECT_ID",
+    storageBucket: "REPLACE_WITH_YOUR_STORAGE_BUCKET",
+    messagingSenderId: "REPLACE_WITH_YOUR_MESSAGING_SENDER_ID",
+    appId: "REPLACE_WITH_YOUR_APP_ID"
   };
   // ============================================================
 
@@ -519,11 +518,10 @@ function renderLeaderboard(){
           else if(aUp<0) dp[m.teamB]+=(-aUp);
         }
       });
-      const aWin=dp[tA]>dp[tB], bWin=dp[tB]>dp[tA];
       html+=`<div class="round-result" style="margin-bottom:4px;">
-        <div class="rr-team" style="color:${aWin?ta.color:'var(--gray)'};">${ta.short}</div>
+        <div class="rr-team" style="color:${ta.color};">${ta.short}</div>
         <div class="rr-score">${dp[tA]} – ${dp[tB]}</div>
-        <div class="rr-team right" style="color:${bWin?tb.color:'var(--gray)'};">${tb.short}</div>
+        <div class="rr-team right" style="color:${tb.color};">${tb.short}</div>
       </div>`;
       dayMatches.forEach(m=>{
         const {aUp,played,result}=calcMatch(m.id);
@@ -578,34 +576,45 @@ function buildMatchCard(m){
   const fmt=result?fmtResult(result,m.pairA,m.pairB):null;
   const isOpen=openPanels[m.id];
   const cardCls=result?'is-done':played>0?'is-live':'';
+  const tA=TEAMS.find(t=>t.id===m.teamA), tB=TEAMS.find(t=>t.id===m.teamB);
+  const cA=tA.color, cB=tB.color;
+
   let statusHtml='';
   if(fmt){
-    statusHtml=`<div class="match-result">${fmt.text}</div><div class="match-pts">${fmt.pts>0?fmt.pts+' pts':'Halved'}</div>`;
+    const winCol=fmt.winner===m.pairA?cA:fmt.winner===m.pairB?cB:'var(--gold)';
+    statusHtml=`<div class="match-result" style="color:${winCol}">${fmt.text}</div><div class="match-pts">${fmt.pts>0?fmt.pts+' pts':'Halved'}</div>`;
   } else if(played>0){
+    const leadCol=aUp===0?'var(--gray)':aUp>0?cA:cB;
     const lbl=aUp===0?'A/S':aUp>0?`${m.pairA.split('&')[0].trim()} +${aUp}`:`${m.pairB.split('&')[0].trim()} +${-aUp}`;
-    statusHtml=`<div class="match-live-tag">${lbl}</div><div class="match-pts">Thru ${played}</div>`;
+    statusHtml=`<div class="match-live-tag" style="color:${leadCol}">${lbl}</div><div class="match-pts">Thru ${played}</div>`;
   } else {
     statusHtml=`<div class="match-pts" style="color:var(--gray)">Tap to score</div>`;
   }
-  const pACls=fmt?(fmt.winner===m.pairA?'winner':'loser'):'';
-  const pBCls=fmt?(fmt.winner===m.pairB?'winner':'loser'):'';
-  return `<div class="match-card ${cardCls}">
+
+  const pACol=fmt?(fmt.winner===m.pairA?cA:'var(--gray)'):`color:${cA}`;
+  const pBCol=fmt?(fmt.winner===m.pairB?cB:'var(--gray)'):`color:${cB}`;
+
+  return `<div class="match-card ${cardCls}" style="border-left:3px solid ${cA}20;">
     <div class="match-header" onclick="togglePanel('${m.id}')">
       <div class="match-teams">
-        <div class="match-pair ${pACls}">${m.pairA}</div>
+        <div class="match-pair" style="color:${fmt?(fmt.winner===m.pairA?cA:'var(--gray)'):cA}">${m.pairA}</div>
         <div class="vs-bar">vs</div>
-        <div class="match-pair ${pBCls}">${m.pairB}</div>
+        <div class="match-pair" style="color:${fmt?(fmt.winner===m.pairB?cB:'var(--gray)'):cB}">${m.pairB}</div>
       </div>
       <div class="match-status">${statusHtml}</div>
       <div class="chevron ${isOpen?'open':''}">▼</div>
     </div>
     <div class="scoring-panel ${isOpen?'open':''}" id="panel-${m.id}">
-      ${buildPanel(m,aUp,played,result,fmt)}
+      ${buildPanel(m,aUp,played,result,fmt,cA,cB)}
     </div>
   </div>`;
 }
 
-function buildPanel(m,aUp,played,result,fmt){
+function buildPanel(m,aUp,played,result,fmt,cA,cB){
+  // Get team colours if not passed (e.g. from edit modal refresh)
+  if(!cA){ cA=TEAMS.find(t=>t.id===m.teamA).color; }
+  if(!cB){ cB=TEAMS.find(t=>t.id===m.teamB).color; }
+
   const h=holes[m.id], ba=bonusHoles[m.id].a, bb=bonusHoles[m.id].b, pb=pending[m.id];
   const next=result?-1:h.findIndex(x=>x===null);
 
@@ -615,15 +624,20 @@ function buildPanel(m,aUp,played,result,fmt){
   for(let i=0;i<18;i++){
     const v=h[i], voided=result&&i>=result.close&&!inEdit;
     const aB=ba.includes(i), bB=bb.includes(i);
-    let cls=voided?'voided':(v==='A'?'won-a':v==='B'?'won-b':v==='H'?'halved':'');
     const dot=(aB||bB)&&!voided?'<span class="bdot"></span>':'';
     const lbl=v==='A'?m.pairA.split('&')[0].trim().substring(0,3):v==='B'?m.pairB.split('&')[0].trim().substring(0,3):v==='H'?'½':'';
-    // Clickable if: in edit mode AND (hole is played OR it's the next unplayed hole)
     const isNextHole=inEdit&&v===null&&i===next;
     const clickable=inEdit&&(v!==null||isNextHole);
-    const editStyle=clickable?(isNextHole?'cursor:pointer;outline:2px dashed rgba(61,186,106,.6);':'cursor:pointer;outline:2px solid rgba(232,196,74,.4);'):'';
-    grid+=`<div class="hole-cell ${cls}" style="${editStyle}" ${clickable?`onclick="openEditHole('${m.id}',${i})"`:''}>
-      <span class="hnum">${i+1}</span><span class="hres">${lbl}</span>${dot}
+    const editOutline=clickable?(isNextHole?`outline:2px dashed ${cA}99`:`outline:2px solid rgba(232,196,74,.4)`):'';
+    // Team-coloured cell backgrounds
+    let cellBg='', cellBorder='rgba(255,255,255,.08)', cellColor='transparent';
+    if(!voided){
+      if(v==='A'){ cellBg=`${cA}33`; cellBorder=`${cA}88`; cellColor=cA; }
+      else if(v==='B'){ cellBg=`${cB}33`; cellBorder=`${cB}88`; cellColor=cB; }
+      else if(v==='H'){ cellBg='rgba(232,196,74,.12)'; cellBorder='rgba(232,196,74,.35)'; cellColor='var(--gold)'; }
+    }
+    grid+=`<div class="hole-cell" style="background:${cellBg};border-color:${cellBorder};${voided?'opacity:.25':''}${clickable?`;cursor:pointer;${editOutline}`:''};" ${clickable?`onclick="openEditHole('${m.id}',${i})"`:''}>
+      <span class="hnum">${i+1}</span><span class="hres" style="color:${cellColor}">${lbl}</span>${dot}
     </div>`;
   }
   grid+='</div>';
@@ -632,21 +646,19 @@ function buildPanel(m,aUp,played,result,fmt){
   let bonusHtml='';
   if(!result&&next>=0){
     const aUsed=bonusUsed(m.id,'a'), bUsed=bonusUsed(m.id,'b');
-    const aRemain=MAX_BONUS-aUsed-(pb.a?1:0);
-    const bRemain=MAX_BONUS-bUsed-(pb.b?1:0);
-    const aDis=(aRemain<=0&&!pb.a)?'disabled':'';
-    const bDis=(bRemain<=0&&!pb.b)?'disabled':'';
+    const aDis=(MAX_BONUS-aUsed-(pb.a?1:0)<=0&&!pb.a)?'disabled':'';
+    const bDis=(MAX_BONUS-bUsed-(pb.b?1:0)<=0&&!pb.b)?'disabled':'';
     const aName=m.pairA.split('&')[0].trim(), bName=m.pairB.split('&')[0].trim();
     bonusHtml=`<div class="bonus-row">
       <div class="bonus-side">
-        <div class="bonus-label">🔥 ${aName}</div>
-        <button class="bonus-btn ${pb.a?'on':''}" ${aDis} onclick="toggleBonus('${m.id}','a')">${pb.a?'✓ Bonus On':'+ Bonus'}</button>
+        <div class="bonus-label" style="color:${cA}">🔥 ${aName}</div>
+        <button class="bonus-btn ${pb.a?'on':''}" style="border-color:${cA};color:${pb.a?'var(--dark)':cA};${pb.a?`background:${cA}`:''};" ${aDis} onclick="toggleBonus('${m.id}','a')">${pb.a?'✓ Bonus On':'+ Bonus'}</button>
         <div class="bonus-left">${MAX_BONUS-aUsed-(pb.a?1:0)} remaining</div>
       </div>
       <div class="bonus-divider"></div>
       <div class="bonus-side" style="text-align:right">
-        <div class="bonus-label" style="text-align:right">🔥 ${bName}</div>
-        <button class="bonus-btn ${pb.b?'on':''}" ${bDis} onclick="toggleBonus('${m.id}','b')">${pb.b?'✓ Bonus On':'+ Bonus'}</button>
+        <div class="bonus-label" style="text-align:right;color:${cB}">🔥 ${bName}</div>
+        <button class="bonus-btn ${pb.b?'on':''}" style="border-color:${cB};color:${pb.b?'var(--dark)':cB};${pb.b?`background:${cB}`:''};" ${bDis} onclick="toggleBonus('${m.id}','b')">${pb.b?'✓ Bonus On':'+ Bonus'}</button>
         <div class="bonus-left">${MAX_BONUS-bUsed-(pb.b?1:0)} remaining</div>
       </div>
     </div>`;
@@ -658,8 +670,8 @@ function buildPanel(m,aUp,played,result,fmt){
     const aName=m.pairA.split('&')[0].trim(), bName=m.pairB.split('&')[0].trim();
     runHtml=`<div class="running-box">
       <div class="running-side">
-        <div class="running-name">${aName}</div>
-        <div class="running-pts ${aUp>0?'leading':''}">${Math.max(0,aUp)}</div>
+        <div class="running-name" style="color:${cA}">${aName}</div>
+        <div class="running-pts" style="color:${aUp>0?cA:'var(--white)'}">${Math.max(0,aUp)}</div>
       </div>
       <div class="running-mid">
         <div class="running-status">Thru</div>
@@ -667,8 +679,8 @@ function buildPanel(m,aUp,played,result,fmt){
         <div class="running-status">${18-played} left</div>
       </div>
       <div class="running-side right">
-        <div class="running-name">${bName}</div>
-        <div class="running-pts ${aUp<0?'leading':''}">${Math.max(0,-aUp)}</div>
+        <div class="running-name" style="color:${cB}">${bName}</div>
+        <div class="running-pts" style="color:${aUp<0?cB:'var(--white)'}">${Math.max(0,-aUp)}</div>
       </div>
     </div>`;
   }
@@ -680,24 +692,24 @@ function buildPanel(m,aUp,played,result,fmt){
     actionHtml=`<div class="hole-entry">
       <div class="hole-entry-label">Hole ${next+1} Winner</div>
       <div class="entry-row">
-        <button class="entry-btn btn-a ${aBon?'bonus-on':''}" onclick="enterHole('${m.id}',${next},'A')">
+        <button class="entry-btn ${aBon?'bonus-on':''}" style="border-color:${aBon?'var(--orange)':cA};color:${aBon?'var(--orange)':cA};${aBon?'background:rgba(232,131,74,.1)':''}" onclick="enterHole('${m.id}',${next},'A')">
           ${m.pairA}${aBon?'<span class="bonus-tag">🔥 +2 pts</span>':''}
         </button>
         <button class="entry-btn btn-half" onclick="enterHole('${m.id}',${next},'H')">½<br>Halved</button>
-        <button class="entry-btn btn-b ${bBon?'bonus-on':''}" onclick="enterHole('${m.id}',${next},'B')">
+        <button class="entry-btn ${bBon?'bonus-on':''}" style="border-color:${bBon?'var(--orange)':cB};color:${bBon?'var(--orange)':cB};${bBon?'background:rgba(232,131,74,.1)':''}" onclick="enterHole('${m.id}',${next},'B')">
           ${m.pairB}${bBon?'<span class="bonus-tag">🔥 +2 pts</span>':''}
         </button>
       </div>
     </div>`;
   } else if(result&&fmt){
-    const col=result.winner==='H'?'var(--gold)':'var(--green-bright)';
-    const winTeam=result.winner==='A'?TEAMS.find(t=>t.id===m.teamA).short:result.winner==='B'?TEAMS.find(t=>t.id===m.teamB).short:null;
+    const winTeam=result.winner==='A'?TEAMS.find(t=>t.id===m.teamA):result.winner==='B'?TEAMS.find(t=>t.id===m.teamB):null;
+    const col=result.winner==='H'?'var(--gold)':winTeam.color;
     const totalBonuses=ba.length+bb.length;
-    const bonusNote=totalBonuses>0?`<div class="final-bonus">🔥 ${ba.length} bonus${ba.length!==1?'es':''} by ${m.pairA.split('&')[0].trim()}, ${bb.length} by ${m.pairB.split('&')[0].trim()}</div>`:'';
-    actionHtml=`<div class="final-box">
+    const bonusNote=totalBonuses>0?`<div class="final-bonus">🔥 ${ba.length} by ${m.pairA.split('&')[0].trim()}, ${bb.length} by ${m.pairB.split('&')[0].trim()}</div>`:'';
+    actionHtml=`<div class="final-box" style="border-color:${col}33;background:${col}10;">
       <div class="final-result" style="color:${col}">${fmt.text}</div>
       <div class="final-detail">${fmt.detail}</div>
-      ${fmt.pts>0?`<div class="final-pts">${fmt.pts} pts → ${winTeam}</div>`:''}
+      ${fmt.pts>0?`<div class="final-pts">${fmt.pts} pts → <span style="color:${col}">${winTeam.short}</span></div>`:''}
       ${bonusNote}
     </div>`;
   }
@@ -799,7 +811,7 @@ function toggleEditMode(id){
 
 function openEditHole(matchId, holeIdx){
   const m=ALL_MATCHES.find(x=>x.id===matchId);
-  const h=holes[matchId][holeIdx]; // null if unplayed
+  const h=holes[matchId][holeIdx];
   const aBonus=bonusHoles[matchId].a.includes(holeIdx);
   const bBonus=bonusHoles[matchId].b.includes(holeIdx);
   const aUsed=bonusUsed(matchId,'a');
@@ -807,25 +819,25 @@ function openEditHole(matchId, holeIdx){
   const aCanBonus=aBonus||(aUsed<MAX_BONUS);
   const bCanBonus=bBonus||(bUsed<MAX_BONUS);
   const isNew=h===null;
+  const cA=TEAMS.find(t=>t.id===m.teamA).color;
+  const cB=TEAMS.find(t=>t.id===m.teamB).color;
 
   document.getElementById('editTitle').textContent=isNew?`Enter Hole ${holeIdx+1}`:`Edit Hole ${holeIdx+1}`;
   document.getElementById('editSub').textContent=`${m.pairA}  vs  ${m.pairB}`;
 
-  // Result buttons — highlight current selection if hole already played
   document.getElementById('editResultRow').innerHTML=`
-    <button class="entry-btn btn-a ${h==='A'?'bonus-on':''}" onclick="editSetResult('${matchId}',${holeIdx},'A')">${m.pairA}</button>
+    <button class="entry-btn" style="border-color:${h==='A'?'var(--gold)':cA};color:${h==='A'?'var(--gold)':cA};${h==='A'?'background:rgba(232,196,74,.1)':''}" onclick="editSetResult('${matchId}',${holeIdx},'A')">${m.pairA}</button>
     <button class="entry-btn btn-half ${h==='H'?'bonus-on':''}" onclick="editSetResult('${matchId}',${holeIdx},'H')" style="padding:13px 10px">½<br>Halved</button>
-    <button class="entry-btn btn-b ${h==='B'?'bonus-on':''}" onclick="editSetResult('${matchId}',${holeIdx},'B')">${m.pairB}</button>
+    <button class="entry-btn" style="border-color:${h==='B'?'var(--gold)':cB};color:${h==='B'?'var(--gold)':cB};${h==='B'?'background:rgba(232,196,74,.1)':''}" onclick="editSetResult('${matchId}',${holeIdx},'B')">${m.pairB}</button>
   `;
 
-  // Bonus buttons — only show if not halved
   const bonusVisible=h!=='H';
   document.getElementById('editBonusRow').innerHTML=bonusVisible?`
-    <button class="edit-bonus-btn ${aBonus?'on':''}" ${!aCanBonus?'disabled':''} onclick="editToggleBonus('${matchId}',${holeIdx},'a')">
-      🔥 ${m.pairA.split('&')[0].trim()} Bonus ${aBonus?'✓':''}
+    <button class="edit-bonus-btn ${aBonus?'on':''}" style="border-color:${cA};color:${aBonus?'var(--dark)':cA};${aBonus?`background:${cA}`:''};" ${!aCanBonus?'disabled':''} onclick="editToggleBonus('${matchId}',${holeIdx},'a')">
+      🔥 ${m.pairA.split('&')[0].trim()} ${aBonus?'✓':''}
     </button>
-    <button class="edit-bonus-btn ${bBonus?'on':''}" ${!bCanBonus?'disabled':''} onclick="editToggleBonus('${matchId}',${holeIdx},'b')">
-      🔥 ${m.pairB.split('&')[0].trim()} Bonus ${bBonus?'✓':''}
+    <button class="edit-bonus-btn ${bBonus?'on':''}" style="border-color:${cB};color:${bBonus?'var(--dark)':cB};${bBonus?`background:${cB}`:''};" ${!bCanBonus?'disabled':''} onclick="editToggleBonus('${matchId}',${holeIdx},'b')">
+      🔥 ${m.pairB.split('&')[0].trim()} ${bBonus?'✓':''}
     </button>
   `:'<div style="font-size:10px;color:var(--gray);text-align:center;padding:4px 0;">No bonus on halved holes</div>';
 
