@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Scramble Wars 2026 ⛳</title>
+<title>IGI 2026 ⛳ Birdie Juice Cup</title>
 
 <!-- Firebase -->
 <script type="module">
@@ -14,14 +14,13 @@
   // PASTE YOUR FIREBASE CONFIG HERE (replace all values below)
   // ============================================================
   const firebaseConfig = {
-apiKey: "AIzaSyBZQ9Jp117xXp9HLe-q_9lJ8ZXs5xZBXws",
-  authDomain: "golf-tournament-2025.firebaseapp.com",
-  databaseURL: "https://golf-tournament-2025-default-rtdb.firebaseio.com",
-  projectId: "golf-tournament-2025",
-  storageBucket: "golf-tournament-2025.firebasestorage.app",
-  messagingSenderId: "1060824673348",
-  appId: "1:1060824673348:web:f8714882de377bb44da011",
-  measurementId: "G-J9XWBBL8NY"
+    apiKey: "REPLACE_WITH_YOUR_API_KEY",
+    authDomain: "REPLACE_WITH_YOUR_AUTH_DOMAIN",
+    databaseURL: "REPLACE_WITH_YOUR_DATABASE_URL",
+    projectId: "REPLACE_WITH_YOUR_PROJECT_ID",
+    storageBucket: "REPLACE_WITH_YOUR_STORAGE_BUCKET",
+    messagingSenderId: "REPLACE_WITH_YOUR_MESSAGING_SENDER_ID",
+    appId: "REPLACE_WITH_YOUR_APP_ID"
   };
   // ============================================================
 
@@ -53,6 +52,11 @@ apiKey: "AIzaSyBZQ9Jp117xXp9HLe-q_9lJ8ZXs5xZBXws",
   --gray-light:  rgba(255,255,255,0.06);
   --dark:        #061410;
   --border:      rgba(255,255,255,0.07);
+  /* Team colours */
+  --t1: #009A44;
+  --t2: #4a8fd4;
+  --t3: #d94f3a;
+  --t4: #39ff14;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--green-dark);color:var(--cream);overflow-x:hidden}
@@ -243,7 +247,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 <body>
 
 <div class="loading-screen" id="loadingScreen">
-  <div class="loading-logo">⛳ Scramble Wars</div>
+  <div class="loading-logo">⛳ IGI 2026</div>
   <div class="loading-sub">Connecting to live scores...</div>
   <div class="loading-spinner"></div>
 </div>
@@ -291,8 +295,8 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 <div class="app" id="mainApp" style="display:none">
   <div class="header">
     <div>
-      <div class="header-title">⛳ Scramble Wars 2026</div>
-      <div class="header-sub">2-Man Scramble · Match Play · 3 Rounds</div>
+      <div class="header-title">⛳ Irresponsible Gentlemen's Invitational</div>
+      <div class="header-sub">2-Man Scramble · Match Play · Birdie Juice Cup</div>
     </div>
     <div class="sync-dot" id="syncDot"></div>
   </div>
@@ -311,10 +315,10 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 // DATA
 // ═══════════════════════════════════════════
 const TEAMS = [
-  {id:1,name:"Certified Ginger Bush Trimmers",short:"Ginger"},
-  {id:2,name:"Uncle Buck's Big Sticks",        short:"Big Sticks"},
-  {id:3,name:"The Ayr Draw Masters",            short:"Ayr Draw"},
-  {id:4,name:"The Double Bogey Write-offs",     short:"Write-offs"}
+  {id:1,name:"Certified Ginger Bush Trimmers",       short:"Gingers",    color:"var(--t1)"},
+  {id:2,name:"Uncle Buck's Big Sticks",               short:"Big Sticks", color:"var(--t2)"},
+  {id:3,name:"Drunken Shannonigans & Bad Decisions",  short:"Shannonigans",color:"var(--t3)"},
+  {id:4,name:"The Double Bogey Write-offs",           short:"Write-offs", color:"var(--t4)"}
 ];
 const SCHEDULE = [
   {day:1,course:"Deerhurst",matchups:[[1,3],[2,4]],matches:[
@@ -477,40 +481,49 @@ function getTeamStats(){
 function renderLeaderboard(){
   const {pts,wins,loss,half}=getTeamStats();
   const sorted=[...TEAMS].sort((a,b)=>pts[b.id]-pts[a.id]);
-  let html='<div style="padding-top:4px;">';
+
+  // Trophy header
+  let html=`<div style="text-align:center;padding:20px 16px 12px;">
+    <div style="font-size:52px;line-height:1;margin-bottom:6px;">🏆</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--gold);letter-spacing:2px;">Birdie Juice Cup</div>
+    <div style="font-size:10px;color:var(--gray);letter-spacing:1px;text-transform:uppercase;margin-top:2px;">Irresponsible Gentlemen's Invitational 2026</div>
+  </div>`;
+
   sorted.forEach((t,i)=>{
-    html+=`<div class="team-card rank-${i+1}">
-      <div class="team-rank">${i+1}</div>
-      <div class="team-info"><div class="team-name">${t.name}</div><div class="team-record">${wins[t.id]}W · ${loss[t.id]}L · ${half[t.id]}H</div></div>
-      <div class="team-points">${pts[t.id]}</div>
+    const rankColors=['var(--gold)','#c0c0c0','#cd7f32','rgba(255,255,255,.12)'];
+    html+=`<div class="team-card rank-${i+1}" style="border-color:${t.color}22;">
+      <div class="team-rank" style="color:${rankColors[i]}">${i+1}</div>
+      <div class="team-info">
+        <div class="team-name" style="color:${t.color}">${t.name}</div>
+        <div class="team-record">${wins[t.id]}W · ${loss[t.id]}L · ${half[t.id]}H</div>
+      </div>
+      <div class="team-points" style="color:${t.color}">${pts[t.id]}</div>
     </div>`;
   });
-  html+='</div><div class="sec-title">Round Results</div>';
+
+  html+='<div class="sec-title">Round Results</div>';
   SCHEDULE.forEach(day=>{
     html+=`<div style="font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--gold);font-weight:600;margin-bottom:8px;">Day ${day.day} · ${day.course}</div>`;
     day.matchups.forEach(([tA,tB])=>{
       const ta=TEAMS.find(t=>t.id===tA),tb=TEAMS.find(t=>t.id===tB);
       const dayMatches=day.matches.filter(m=>(m.teamA===tA&&m.teamB===tB)||(m.teamA===tB&&m.teamB===tA));
-      // Team points: completed matches + live running totals from in-progress matches
       const dp={[tA]:0,[tB]:0};
       dayMatches.forEach(m=>{
         const {aUp,played,result}=calcMatch(m.id);
         if(result){
-          // Match finished — use final margin
           if(result.winner==='H') return;
           dp[result.winner==='A'?m.teamA:m.teamB]+=result.margin;
         } else if(played>0){
-          // Match in progress — show current running score
           if(aUp>0) dp[m.teamA]+=aUp;
           else if(aUp<0) dp[m.teamB]+=(-aUp);
         }
       });
+      const aWin=dp[tA]>dp[tB], bWin=dp[tB]>dp[tA];
       html+=`<div class="round-result" style="margin-bottom:4px;">
-        <div class="rr-team ${dp[tA]>dp[tB]?'winning':'losing'}">${ta.short}</div>
+        <div class="rr-team" style="color:${aWin?ta.color:'var(--gray)'};">${ta.short}</div>
         <div class="rr-score">${dp[tA]} – ${dp[tB]}</div>
-        <div class="rr-team right ${dp[tB]>dp[tA]?'winning':'losing'}">${tb.short}</div>
+        <div class="rr-team right" style="color:${bWin?tb.color:'var(--gray)'};">${tb.short}</div>
       </div>`;
-      // Individual match live status rows
       dayMatches.forEach(m=>{
         const {aUp,played,result}=calcMatch(m.id);
         const fmt=result?fmtResult(result,m.pairA,m.pairB):null;
@@ -526,6 +539,15 @@ function renderLeaderboard(){
         } else {
           statusText='Not started';
         }
+        html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 14px;background:rgba(0,0,0,.15);margin-bottom:2px;border-radius:6px;">
+          <div style="font-size:10px;color:var(--gray);">${aName} & ${m.pairA.split('&')[1]?.trim()} <span style="opacity:.5">vs</span> ${bName} & ${m.pairB.split('&')[1]?.trim()}</div>
+          <div style="font-size:10px;color:${statusColor};font-family:'DM Mono',monospace;text-align:right;margin-left:8px;">${statusText}</div>
+        </div>`;
+      });
+      html+='<div style="margin-bottom:10px;"></div>';
+    });
+    html+='<div style="margin-bottom:4px;"></div>';
+  });
         html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 14px;background:rgba(0,0,0,.15);margin-bottom:2px;border-radius:6px;">
           <div style="font-size:10px;color:var(--gray);">${aName} & ${m.pairA.split('&')[1]?.trim()} <span style="opacity:.5">vs</span> ${bName} & ${m.pairB.split('&')[1]?.trim()}</div>
           <div style="font-size:10px;color:${statusColor};font-family:'DM Mono',monospace;text-align:right;margin-left:8px;">${statusText}</div>
@@ -595,7 +617,7 @@ function buildPanel(m,aUp,played,result,fmt){
   const h=holes[m.id], ba=bonusHoles[m.id].a, bb=bonusHoles[m.id].b, pb=pending[m.id];
   const next=result?-1:h.findIndex(x=>x===null);
 
-  // Hole grid — tappable in edit mode
+  // Hole grid — tappable in edit mode (played holes + next unplayed hole)
   const inEdit=editMode[m.id];
   let grid='<div class="hole-grid">';
   for(let i=0;i<18;i++){
@@ -604,8 +626,10 @@ function buildPanel(m,aUp,played,result,fmt){
     let cls=voided?'voided':(v==='A'?'won-a':v==='B'?'won-b':v==='H'?'halved':'');
     const dot=(aB||bB)&&!voided?'<span class="bdot"></span>':'';
     const lbl=v==='A'?m.pairA.split('&')[0].trim().substring(0,3):v==='B'?m.pairB.split('&')[0].trim().substring(0,3):v==='H'?'½':'';
-    const clickable=inEdit&&v!==null;
-    const editStyle=clickable?'cursor:pointer;outline:2px solid rgba(232,196,74,.4);':'';
+    // Clickable if: in edit mode AND (hole is played OR it's the next unplayed hole)
+    const isNextHole=inEdit&&v===null&&i===next;
+    const clickable=inEdit&&(v!==null||isNextHole);
+    const editStyle=clickable?(isNextHole?'cursor:pointer;outline:2px dashed rgba(61,186,106,.6);':'cursor:pointer;outline:2px solid rgba(232,196,74,.4);'):'';
     grid+=`<div class="hole-cell ${cls}" style="${editStyle}" ${clickable?`onclick="openEditHole('${m.id}',${i})"`:''}>
       <span class="hnum">${i+1}</span><span class="hres">${lbl}</span>${dot}
     </div>`;
@@ -687,9 +711,8 @@ function buildPanel(m,aUp,played,result,fmt){
   }
 
   const inEditMode=editMode[m.id];
-  const undoHtml=played>0&&!inEditMode?`<button class="undo-btn" onclick="undoHole('${m.id}')">↩ Undo Last Hole</button>`:'';
-  const editBtnHtml=played>0?`<button class="edit-btn ${inEditMode?'active':''}" onclick="toggleEditMode('${m.id}')">${inEditMode?'✓ Done Editing':'✏️ Edit a Hole'}</button>`:'';
-  return grid+bonusHtml+runHtml+actionHtml+undoHtml+editBtnHtml;
+  const editBtnHtml=`<button class="edit-btn ${inEditMode?'active':''}" onclick="toggleEditMode('${m.id}')">${inEditMode?'✓ Done Editing':'✏️ Edit a Hole'}</button>`;
+  return grid+bonusHtml+runHtml+actionHtml+editBtnHtml;
 }
 
 // ═══════════════════════════════════════════
@@ -726,8 +749,8 @@ function renderStats(){
   [...TEAMS].sort((a,b)=>pts[b.id]-pts[a.id]).forEach(t=>{
     const pct=(pts[t.id]/maxPts)*100;
     html+=`<div class="bar-row">
-      <div class="bar-top"><span class="bar-name">${t.short}</span><span class="bar-pts">${pts[t.id]} pts</span></div>
-      <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+      <div class="bar-top"><span class="bar-name" style="color:${t.color}">${t.short}</span><span class="bar-pts" style="color:${t.color}">${pts[t.id]} pts</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${t.color};"></div></div>
       <div class="bar-rec">${wins[t.id]}W · ${loss[t.id]}L · ${half[t.id]}H</div>
     </div>`;
   });
@@ -768,20 +791,6 @@ function enterHole(id,idx,result){
   saveMatch(id); render();
 }
 
-function undoHole(id){
-  const h=holes[id];
-  for(let i=17;i>=0;i--){
-    if(h[i]!==null){
-      bonusHoles[id].a=bonusHoles[id].a.filter(x=>x!==i);
-      bonusHoles[id].b=bonusHoles[id].b.filter(x=>x!==i);
-      pending[id].a=false;
-      pending[id].b=false;
-      savePending(id);
-      h[i]=null; break;
-    }
-  }
-  saveMatch(id); render();
-}
 
 // ═══════════════════════════════════════════
 // PIN SYSTEM
@@ -798,36 +807,36 @@ function toggleEditMode(id){
 
 function openEditHole(matchId, holeIdx){
   const m=ALL_MATCHES.find(x=>x.id===matchId);
-  const h=holes[matchId][holeIdx];
+  const h=holes[matchId][holeIdx]; // null if unplayed
   const aBonus=bonusHoles[matchId].a.includes(holeIdx);
   const bBonus=bonusHoles[matchId].b.includes(holeIdx);
   const aUsed=bonusUsed(matchId,'a');
   const bUsed=bonusUsed(matchId,'b');
-  // Can add bonus if not already on AND haven't used max (or already on this hole)
   const aCanBonus=aBonus||(aUsed<MAX_BONUS);
   const bCanBonus=bBonus||(bUsed<MAX_BONUS);
+  const isNew=h===null;
 
-  document.getElementById('editTitle').textContent=`Edit Hole ${holeIdx+1}`;
+  document.getElementById('editTitle').textContent=isNew?`Enter Hole ${holeIdx+1}`:`Edit Hole ${holeIdx+1}`;
   document.getElementById('editSub').textContent=`${m.pairA}  vs  ${m.pairB}`;
 
-  // Result buttons
+  // Result buttons — highlight current selection if hole already played
   document.getElementById('editResultRow').innerHTML=`
     <button class="entry-btn btn-a ${h==='A'?'bonus-on':''}" onclick="editSetResult('${matchId}',${holeIdx},'A')">${m.pairA}</button>
     <button class="entry-btn btn-half ${h==='H'?'bonus-on':''}" onclick="editSetResult('${matchId}',${holeIdx},'H')" style="padding:13px 10px">½<br>Halved</button>
     <button class="entry-btn btn-b ${h==='B'?'bonus-on':''}" onclick="editSetResult('${matchId}',${holeIdx},'B')">${m.pairB}</button>
   `;
 
-  // Bonus buttons
-  document.getElementById('editBonusRow').innerHTML=`
+  // Bonus buttons — only show if not halved
+  const bonusVisible=h!=='H';
+  document.getElementById('editBonusRow').innerHTML=bonusVisible?`
     <button class="edit-bonus-btn ${aBonus?'on':''}" ${!aCanBonus?'disabled':''} onclick="editToggleBonus('${matchId}',${holeIdx},'a')">
       🔥 ${m.pairA.split('&')[0].trim()} Bonus ${aBonus?'✓':''}
     </button>
     <button class="edit-bonus-btn ${bBonus?'on':''}" ${!bCanBonus?'disabled':''} onclick="editToggleBonus('${matchId}',${holeIdx},'b')">
       🔥 ${m.pairB.split('&')[0].trim()} Bonus ${bBonus?'✓':''}
     </button>
-  `;
+  `:'<div style="font-size:10px;color:var(--gray);text-align:center;padding:4px 0;">No bonus on halved holes</div>';
 
-  // Store current edit context
   document.getElementById('editOverlay').dataset.matchId=matchId;
   document.getElementById('editOverlay').dataset.holeIdx=holeIdx;
   document.getElementById('editOverlay').style.display='flex';
