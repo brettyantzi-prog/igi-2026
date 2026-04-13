@@ -1,1 +1,1 @@
-# golf-tournament-2025
+# Irrespondible Gentleman's Invitational 2026
