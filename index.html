@@ -145,8 +145,10 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .hole-cell.halved{background:rgba(232,196,74,.12);border-color:rgba(232,196,74,.35)}
 .hole-cell.halved .hres{color:var(--gold)}
 .hole-cell.voided{opacity:.25}
-.hole-cell .bdot{position:absolute;top:2px;right:2px;width:4px;height:4px;border-radius:50%;background:var(--orange)}
-.hole-cell .mdot{position:absolute;bottom:2px;left:2px;width:4px;height:4px;border-radius:50%;background:var(--blue)}
+.hole-cell .bdot-a{position:absolute;top:2px;left:2px;width:4px;height:4px;border-radius:50%;background:var(--orange)}
+.hole-cell .bdot-b{position:absolute;top:2px;right:2px;width:4px;height:4px;border-radius:50%;background:var(--orange)}
+.hole-cell .mdot-a{position:absolute;bottom:2px;left:2px;width:4px;height:4px;border-radius:50%;background:var(--blue)}
+.hole-cell .mdot-b{position:absolute;bottom:2px;right:2px;width:4px;height:4px;border-radius:50%;background:var(--blue)}
 
 /* BONUS ROW */
 .bonus-row{display:flex;align-items:center;gap:8px;background:rgba(232,131,74,.06);border:1px solid rgba(232,131,74,.2);border-radius:10px;padding:10px 12px;margin-bottom:8px}
@@ -230,6 +232,9 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .edit-bonus-btn.on{background:var(--orange);color:var(--dark)}
 .edit-bonus-btn:disabled{opacity:.3;cursor:default;border-color:var(--gray);color:var(--gray)}
 .edit-bonus-btn.on:disabled{background:var(--gray);border-color:var(--gray)}
+.edit-mu-btn{flex:1;padding:9px;border-radius:8px;border:1.5px solid var(--blue);background:transparent;color:var(--blue);font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s}
+.edit-mu-btn.on{background:var(--blue);color:var(--dark)}
+.edit-mu-btn:disabled{opacity:.3;cursor:default;border-color:var(--gray);color:var(--gray)}
 .edit-close{width:100%;padding:12px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:10px;color:var(--white);font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
 
 /* PIN MODAL */
@@ -264,6 +269,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
     <div class="edit-modal-sub" id="editSub"></div>
     <div class="edit-hole-result" id="editResultRow"></div>
     <div class="edit-bonus-row" id="editBonusRow"></div>
+    <div class="edit-bonus-row" id="editMuRow"></div>
     <button class="edit-close" onclick="closeEdit()">Done</button>
   </div>
 </div>
@@ -347,6 +353,7 @@ const SCHEDULE = [
 ];
 const ALL_MATCHES = SCHEDULE.flatMap(d=>d.matches);
 const MAX_BONUS = 2;
+const MAX_MU    = 2;
 
 // ═══════════════════════════════════════════
 // STATE
@@ -663,9 +670,11 @@ function buildPanel(m,aUp,played,result,fmt,cA,cB){
   for(let i=0;i<18;i++){
     const v=h[i], voided=result&&i>=result.close&&!inEdit;
     const aB=ba.includes(i), bB=bb.includes(i);
-    const dot=(aB||bB)&&!voided?'<span class="bdot"></span>':'';
+    const bdotA=aB&&!voided?'<span class="bdot-a"></span>':'';
+    const bdotB=bB&&!voided?'<span class="bdot-b"></span>':'';
     const aMu=mua.includes(i), bMu=mub.includes(i);
-    const mdot=(aMu||bMu)&&!voided?'<span class="mdot"></span>':'';
+    const mdotA=aMu&&!voided?'<span class="mdot-a"></span>':'';
+    const mdotB=bMu&&!voided?'<span class="mdot-b"></span>':'';
     const lbl=v==='A'?m.pairA.split('&')[0].trim().substring(0,3):v==='B'?m.pairB.split('&')[0].trim().substring(0,3):v==='H'?'½':'';
     const isNextHole=inEdit&&v===null&&i===next;
     const clickable=inEdit&&(v!==null||isNextHole);
@@ -678,7 +687,7 @@ function buildPanel(m,aUp,played,result,fmt,cA,cB){
       else if(v==='H'){ cellBg='rgba(232,196,74,.12)'; cellBorder='rgba(232,196,74,.35)'; cellColor='var(--gold)'; }
     }
     grid+=`<div class="hole-cell" style="background:${cellBg};border-color:${cellBorder};${voided?'opacity:.25':''}${clickable?`;cursor:pointer;${editOutline}`:''};" ${clickable?`onclick="openEditHole('${m.id}',${i})"`:''}>
-      <span class="hnum">${i+1}</span><span class="hres" style="color:${cellColor}">${lbl}</span>${dot}${mdot}
+      <span class="hnum">${i+1}</span><span class="hres" style="color:${cellColor}">${lbl}</span>${bdotA}${bdotB}${mdotA}${mdotB}
     </div>`;
   }
   grid+='</div>';
@@ -706,7 +715,6 @@ function buildPanel(m,aUp,played,result,fmt,cA,cB){
 
   // Mulligan tracker
   const mu=mulligans[m.id];
-  const MAX_MU=2;
   const amuLeft=MAX_MU-mu.a.length, bmuLeft=MAX_MU-mu.b.length;
   let mulliganHtml=`<div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
     <div style="flex:1;">
@@ -908,6 +916,10 @@ function openEditHole(matchId, holeIdx){
   const bUsed=bonusUsed(matchId,'b');
   const aCanBonus=aBonus||(aUsed<MAX_BONUS);
   const bCanBonus=bBonus||(bUsed<MAX_BONUS);
+  const aMu=mulligans[matchId].a.includes(holeIdx);
+  const bMu=mulligans[matchId].b.includes(holeIdx);
+  const aCanMu=aMu||(mulligans[matchId].a.length<MAX_MU);
+  const bCanMu=bMu||(mulligans[matchId].b.length<MAX_MU);
   const isNew=h===null;
   const cA=TEAMS.find(t=>t.id===m.teamA).color;
   const cB=TEAMS.find(t=>t.id===m.teamB).color;
@@ -921,15 +933,23 @@ function openEditHole(matchId, holeIdx){
     <button class="entry-btn" style="border-color:${h==='B'?'var(--gold)':cB};color:${h==='B'?'var(--gold)':cB};${h==='B'?'background:rgba(232,196,74,.1)':''}" onclick="editSetResult('${matchId}',${holeIdx},'B')">${m.pairB}</button>
   `;
 
-  const bonusVisible=h!=='H';
-  document.getElementById('editBonusRow').innerHTML=bonusVisible?`
+  document.getElementById('editBonusRow').innerHTML=`
     <button class="edit-bonus-btn ${aBonus?'on':''}" style="border-color:${cA};color:${aBonus?'var(--dark)':cA};${aBonus?`background:${cA}`:''};" ${!aCanBonus?'disabled':''} onclick="editToggleBonus('${matchId}',${holeIdx},'a')">
       🔥 ${m.pairA.split('&')[0].trim()} ${aBonus?'✓':''}
     </button>
     <button class="edit-bonus-btn ${bBonus?'on':''}" style="border-color:${cB};color:${bBonus?'var(--dark)':cB};${bBonus?`background:${cB}`:''};" ${!bCanBonus?'disabled':''} onclick="editToggleBonus('${matchId}',${holeIdx},'b')">
       🔥 ${m.pairB.split('&')[0].trim()} ${bBonus?'✓':''}
     </button>
-  `:'<div style="font-size:10px;color:var(--gray);text-align:center;padding:4px 0;">No bonus on halved holes</div>';
+  `;
+
+  document.getElementById('editMuRow').innerHTML=`
+    <button class="edit-mu-btn ${aMu?'on':''}" ${!aCanMu?'disabled':''} onclick="editToggleMulligan('${matchId}',${holeIdx},'a')">
+      🔄 ${m.pairA.split('&')[0].trim()} ${aMu?'✓':''}
+    </button>
+    <button class="edit-mu-btn ${bMu?'on':''}" ${!bCanMu?'disabled':''} onclick="editToggleMulligan('${matchId}',${holeIdx},'b')">
+      🔄 ${m.pairB.split('&')[0].trim()} ${bMu?'✓':''}
+    </button>
+  `;
 
   document.getElementById('editOverlay').dataset.matchId=matchId;
   document.getElementById('editOverlay').dataset.holeIdx=holeIdx;
@@ -938,10 +958,6 @@ function openEditHole(matchId, holeIdx){
 
 function editSetResult(matchId, holeIdx, result){
   holes[matchId][holeIdx]=result;
-  if(result==='H'){
-    bonusHoles[matchId].a=bonusHoles[matchId].a.filter(x=>x!==holeIdx);
-    bonusHoles[matchId].b=bonusHoles[matchId].b.filter(x=>x!==holeIdx);
-  }
   saveMatch(matchId);
   openEditHole(matchId, holeIdx);
   render();
@@ -957,6 +973,16 @@ function editToggleBonus(matchId, holeIdx, side){
   } else {
     bonusHoles[matchId][side].push(holeIdx);
   }
+  saveMatch(matchId);
+  openEditHole(matchId, holeIdx);
+  render();
+}
+
+function editToggleMulligan(matchId, holeIdx, side){
+  const arr=mulligans[matchId][side];
+  const hasMu=arr.includes(holeIdx);
+  if(!hasMu && arr.length>=MAX_MU) return;
+  mulligans[matchId][side]=hasMu?arr.filter(x=>x!==holeIdx):[...arr,holeIdx];
   saveMatch(matchId);
   openEditHole(matchId, holeIdx);
   render();
