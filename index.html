@@ -371,34 +371,54 @@ ALL_MATCHES.forEach(m=>{
 // ═══════════════════════════════════════════
 document.addEventListener('firebase-ready',()=>{
   const dot=document.getElementById('syncDot');
-  window._fbListen('tournament',(data)=>{
+  // Use separate listeners per sub-path so a holes write never triggers a
+  // re-read of stale bonus/mulligan data and vice versa.
+  const _ready={holes:false,bonus:false,mulligans:false};
+  function _onSync(){
+    loadAllPending();
+    dot.className='sync-dot live';
+    if(_ready.holes&&_ready.bonus&&_ready.mulligans) hideLoading();
+    render();
+  }
+  window._fbListen('tournament/holes',(data)=>{
     if(data){
       ALL_MATCHES.forEach(m=>{
-        if(data.holes&&data.holes[m.id]){
-          const s=data.holes[m.id];
+        if(data[m.id]){
+          const s=data[m.id];
           const arr=Array(18).fill(null);
           if(Array.isArray(s)) s.forEach((v,i)=>arr[i]=v);
           else Object.keys(s).forEach(k=>{const i=parseInt(k);if(i>=0&&i<18)arr[i]=s[k];});
           holes[m.id]=arr;
         }
-        if(data.bonus&&data.bonus[m.id]){
-          const b=data.bonus[m.id];
+      });
+    }
+    _ready.holes=true; _onSync();
+  });
+  window._fbListen('tournament/bonus',(data)=>{
+    if(data){
+      ALL_MATCHES.forEach(m=>{
+        if(data[m.id]){
+          const b=data[m.id];
           bonusHoles[m.id]={
             a:Array.isArray(b.a)?b.a:Object.values(b.a||{}),
             b:Array.isArray(b.b)?b.b:Object.values(b.b||{})
           };
         }
-        if(data.mulligans&&data.mulligans[m.id]){
-          const d=data.mulligans[m.id];
+      });
+    }
+    _ready.bonus=true; _onSync();
+  });
+  window._fbListen('tournament/mulligans',(data)=>{
+    if(data){
+      ALL_MATCHES.forEach(m=>{
+        if(data[m.id]){
+          const d=data[m.id];
           const parseM=v=>Array.isArray(v)?v.filter(x=>x>=0&&x<18):typeof v==='object'&&v?Object.values(v).filter(x=>x>=0&&x<18):[];
           mulligans[m.id]={a:parseM(d.a),b:parseM(d.b)};
         }
       });
-      // pending is intentionally NOT synced via Firebase - stored in sessionStorage instead
-      loadAllPending();
     }
-    dot.className='sync-dot live';
-    hideLoading(); render();
+    _ready.mulligans=true; _onSync();
   });
 });
 
@@ -407,11 +427,9 @@ async function saveMatch(id){
   const dot=document.getElementById('syncDot');
   dot.className='sync-dot';
   try{
-    // Save bonus first so that when the holes onValue fires it already sees the
-    // correct bonus data in Firebase, preventing a stale-read race condition.
-    await window._fbSet('tournament/bonus/'+id, bonusHoles[id]);
     await Promise.all([
       window._fbSet('tournament/holes/'+id,     holes[id]),
+      window._fbSet('tournament/bonus/'+id,     bonusHoles[id]),
       window._fbSet('tournament/mulligans/'+id, mulligans[id]),
     ]);
     dot.className='sync-dot live';
