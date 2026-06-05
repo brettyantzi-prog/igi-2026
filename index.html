@@ -146,6 +146,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .hole-cell.halved .hres{color:var(--gold)}
 .hole-cell.voided{opacity:.25}
 .hole-cell .bdot{position:absolute;top:2px;right:2px;width:4px;height:4px;border-radius:50%;background:var(--orange)}
+.hole-cell .mdot{position:absolute;bottom:2px;left:2px;width:4px;height:4px;border-radius:50%;background:var(--blue)}
 
 /* BONUS ROW */
 .bonus-row{display:flex;align-items:center;gap:8px;background:rgba(232,131,74,.06);border:1px solid rgba(232,131,74,.2);border-radius:10px;padding:10px 12px;margin-bottom:8px}
@@ -362,7 +363,7 @@ ALL_MATCHES.forEach(m=>{
   holes[m.id]      = Array(18).fill(null);
   bonusHoles[m.id] = {a:[],b:[]};
   pending[m.id]    = {a:false,b:false};
-  mulligans[m.id]  = {a:0,b:0};
+  mulligans[m.id]  = {a:[],b:[]};
 });
 
 // ═══════════════════════════════════════════
@@ -388,10 +389,9 @@ document.addEventListener('firebase-ready',()=>{
           };
         }
         if(data.mulligans&&data.mulligans[m.id]){
-          mulligans[m.id]={
-            a:Math.max(0,Math.min(2,Number(data.mulligans[m.id].a)||0)),
-            b:Math.max(0,Math.min(2,Number(data.mulligans[m.id].b)||0))
-          };
+          const d=data.mulligans[m.id];
+          const parseM=v=>Array.isArray(v)?v.filter(x=>x>=0&&x<18):typeof v==='object'&&v?Object.values(v).filter(x=>x>=0&&x<18):[];
+          mulligans[m.id]={a:parseM(d.a),b:parseM(d.b)};
         }
       });
       // pending is intentionally NOT synced via Firebase - stored in sessionStorage instead
@@ -634,6 +634,7 @@ function buildPanel(m,aUp,played,result,fmt,cA,cB){
   if(!cB){ cB=TEAMS.find(t=>t.id===m.teamB).color; }
 
   const h=holes[m.id], ba=bonusHoles[m.id].a, bb=bonusHoles[m.id].b, pb=pending[m.id];
+  const mua=mulligans[m.id].a, mub=mulligans[m.id].b;
   const next=result?-1:h.findIndex(x=>x===null);
 
   // Hole grid — tappable in edit mode (played holes + next unplayed hole)
@@ -643,6 +644,8 @@ function buildPanel(m,aUp,played,result,fmt,cA,cB){
     const v=h[i], voided=result&&i>=result.close&&!inEdit;
     const aB=ba.includes(i), bB=bb.includes(i);
     const dot=(aB||bB)&&!voided?'<span class="bdot"></span>':'';
+    const aMu=mua.includes(i), bMu=mub.includes(i);
+    const mdot=(aMu||bMu)&&!voided?'<span class="mdot"></span>':'';
     const lbl=v==='A'?m.pairA.split('&')[0].trim().substring(0,3):v==='B'?m.pairB.split('&')[0].trim().substring(0,3):v==='H'?'½':'';
     const isNextHole=inEdit&&v===null&&i===next;
     const clickable=inEdit&&(v!==null||isNextHole);
@@ -655,7 +658,7 @@ function buildPanel(m,aUp,played,result,fmt,cA,cB){
       else if(v==='H'){ cellBg='rgba(232,196,74,.12)'; cellBorder='rgba(232,196,74,.35)'; cellColor='var(--gold)'; }
     }
     grid+=`<div class="hole-cell" style="background:${cellBg};border-color:${cellBorder};${voided?'opacity:.25':''}${clickable?`;cursor:pointer;${editOutline}`:''};" ${clickable?`onclick="openEditHole('${m.id}',${i})"`:''}>
-      <span class="hnum">${i+1}</span><span class="hres" style="color:${cellColor}">${lbl}</span>${dot}
+      <span class="hnum">${i+1}</span><span class="hres" style="color:${cellColor}">${lbl}</span>${dot}${mdot}
     </div>`;
   }
   grid+='</div>';
@@ -684,13 +687,13 @@ function buildPanel(m,aUp,played,result,fmt,cA,cB){
   // Mulligan tracker
   const mu=mulligans[m.id];
   const MAX_MU=2;
-  const amuLeft=MAX_MU-mu.a, bmuLeft=MAX_MU-mu.b;
+  const amuLeft=MAX_MU-mu.a.length, bmuLeft=MAX_MU-mu.b.length;
   let mulliganHtml=`<div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
     <div style="flex:1;">
       <div style="font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:${cA};font-weight:600;margin-bottom:6px;">🔄 ${m.pairA}</div>
       <div style="display:flex;gap:6px;align-items:center;">
-        <button onclick="useMulligan('${m.id}','a')" ${mu.a>=MAX_MU?'disabled':''} style="padding:6px 10px;border-radius:6px;border:1.5px solid ${cA};background:transparent;color:${cA};font-size:11px;font-weight:600;cursor:pointer;${mu.a>=MAX_MU?'opacity:.3;cursor:default;':''}font-family:'DM Sans',sans-serif;">Use</button>
-        <button onclick="undoMulligan('${m.id}','a')" ${mu.a<=0?'disabled':''} style="padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--gray);font-size:11px;cursor:pointer;${mu.a<=0?'opacity:.3;cursor:default;':''}font-family:'DM Sans',sans-serif;">↩</button>
+        <button onclick="useMulligan('${m.id}','a')" ${mu.a.length>=MAX_MU?'disabled':''} style="padding:6px 10px;border-radius:6px;border:1.5px solid ${cA};background:transparent;color:${cA};font-size:11px;font-weight:600;cursor:pointer;${mu.a.length>=MAX_MU?'opacity:.3;cursor:default;':''}font-family:'DM Sans',sans-serif;">Use</button>
+        <button onclick="undoMulligan('${m.id}','a')" ${mu.a.length<=0?'disabled':''} style="padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--gray);font-size:11px;cursor:pointer;${mu.a.length<=0?'opacity:.3;cursor:default;':''}font-family:'DM Sans',sans-serif;">↩</button>
         <span style="font-family:'DM Mono',monospace;font-size:11px;color:${amuLeft>0?cA:'var(--gray)'};">${amuLeft} left</span>
       </div>
     </div>
@@ -699,8 +702,8 @@ function buildPanel(m,aUp,played,result,fmt,cA,cB){
       <div style="font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:${cB};font-weight:600;margin-bottom:6px;">🔄 ${m.pairB}</div>
       <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;">
         <span style="font-family:'DM Mono',monospace;font-size:11px;color:${bmuLeft>0?cB:'var(--gray)'};">${bmuLeft} left</span>
-        <button onclick="undoMulligan('${m.id}','b')" ${mu.b<=0?'disabled':''} style="padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--gray);font-size:11px;cursor:pointer;${mu.b<=0?'opacity:.3;cursor:default;':''}font-family:'DM Sans',sans-serif;">↩</button>
-        <button onclick="useMulligan('${m.id}','b')" ${mu.b>=MAX_MU?'disabled':''} style="padding:6px 10px;border-radius:6px;border:1.5px solid ${cB};background:transparent;color:${cB};font-size:11px;font-weight:600;cursor:pointer;${mu.b>=MAX_MU?'opacity:.3;cursor:default;':''}font-family:'DM Sans',sans-serif;">Use</button>
+        <button onclick="undoMulligan('${m.id}','b')" ${mu.b.length<=0?'disabled':''} style="padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--gray);font-size:11px;cursor:pointer;${mu.b.length<=0?'opacity:.3;cursor:default;':''}font-family:'DM Sans',sans-serif;">↩</button>
+        <button onclick="useMulligan('${m.id}','b')" ${mu.b.length>=MAX_MU?'disabled':''} style="padding:6px 10px;border-radius:6px;border:1.5px solid ${cB};background:transparent;color:${cB};font-size:11px;font-weight:600;cursor:pointer;${mu.b.length>=MAX_MU?'opacity:.3;cursor:default;':''}font-family:'DM Sans',sans-serif;">Use</button>
       </div>
     </div>
   </div>`;
@@ -857,14 +860,18 @@ let pinAttempts = 0;
 let pinLocked   = false;
 
 function useMulligan(id,side){
-  if(mulligans[id][side]>=2) return;
-  mulligans[id][side]++;
+  if(mulligans[id][side].length>=2) return;
+  const h=holes[id];
+  let holeIdx=h.findIndex(x=>x===null);
+  if(holeIdx<0) holeIdx=h.reduce((acc,v,i)=>v!==null?i:acc,-1);
+  if(holeIdx<0) return;
+  mulligans[id][side].push(holeIdx);
   saveMatch(id); render();
 }
 
 function undoMulligan(id,side){
-  if(mulligans[id][side]<=0) return;
-  mulligans[id][side]--;
+  if(mulligans[id][side].length<=0) return;
+  mulligans[id][side].pop();
   saveMatch(id); render();
 }
 
@@ -880,8 +887,8 @@ function openEditHole(matchId, holeIdx){
   const bBonus=bonusHoles[matchId].b.includes(holeIdx);
   const aUsed=bonusUsed(matchId,'a');
   const bUsed=bonusUsed(matchId,'b');
-  const aCanBonus=aBonus||(aUsed<MAX_BONUS);
-  const bCanBonus=bBonus||(bUsed<MAX_BONUS);
+  const aCanBonus = h===null ? (aBonus||(aUsed<MAX_BONUS)) : h==='A' ? (aBonus||(aUsed<MAX_BONUS)) : aBonus;
+  const bCanBonus = h===null ? (bBonus||(bUsed<MAX_BONUS)) : h==='B' ? (bBonus||(bUsed<MAX_BONUS)) : bBonus;
   const isNew=h===null;
   const cA=TEAMS.find(t=>t.id===m.teamA).color;
   const cB=TEAMS.find(t=>t.id===m.teamB).color;
@@ -912,13 +919,15 @@ function openEditHole(matchId, holeIdx){
 
 function editSetResult(matchId, holeIdx, result){
   holes[matchId][holeIdx]=result;
-  // If changed to halved, remove bonuses for this hole
   if(result==='H'){
     bonusHoles[matchId].a=bonusHoles[matchId].a.filter(x=>x!==holeIdx);
     bonusHoles[matchId].b=bonusHoles[matchId].b.filter(x=>x!==holeIdx);
+  } else if(result==='A'){
+    bonusHoles[matchId].b=bonusHoles[matchId].b.filter(x=>x!==holeIdx);
+  } else if(result==='B'){
+    bonusHoles[matchId].a=bonusHoles[matchId].a.filter(x=>x!==holeIdx);
   }
   saveMatch(matchId);
-  // Refresh the modal buttons to show new selection
   openEditHole(matchId, holeIdx);
   render();
 }
