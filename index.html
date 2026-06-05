@@ -27,7 +27,10 @@ const firebaseConfig = {
 
   const app = initializeApp(firebaseConfig);
   const db  = getDatabase(app);
-  window._fbSet    = (path, value) => set(ref(db, path), value);
+  window._fbSet    = (path, value) => {
+    if(!/^tournament\/(holes|bonus|mulligans)\/[a-z0-9]+$/.test(path)) throw new Error('Blocked: invalid path');
+    return set(ref(db, path), value);
+  };
   window._fbListen = (path, cb)    => onValue(ref(db, path), snap => cb(snap.val()));
   window._firebaseReady = true;
   document.dispatchEvent(new Event('firebase-ready'));
@@ -374,7 +377,7 @@ document.addEventListener('firebase-ready',()=>{
           const s=data.holes[m.id];
           const arr=Array(18).fill(null);
           if(Array.isArray(s)) s.forEach((v,i)=>arr[i]=v);
-          else Object.keys(s).forEach(k=>arr[parseInt(k)]=s[k]);
+          else Object.keys(s).forEach(k=>{const i=parseInt(k);if(i>=0&&i<18)arr[i]=s[k];});
           holes[m.id]=arr;
         }
         if(data.bonus&&data.bonus[m.id]){
@@ -386,13 +389,13 @@ document.addEventListener('firebase-ready',()=>{
         }
         if(data.mulligans&&data.mulligans[m.id]){
           mulligans[m.id]={
-            a:data.mulligans[m.id].a||0,
-            b:data.mulligans[m.id].b||0
+            a:Math.max(0,Math.min(2,Number(data.mulligans[m.id].a)||0)),
+            b:Math.max(0,Math.min(2,Number(data.mulligans[m.id].b)||0))
           };
         }
-        // pending is intentionally NOT synced via Firebase - stored in sessionStorage instead
-        loadAllPending();
       });
+      // pending is intentionally NOT synced via Firebase - stored in sessionStorage instead
+      loadAllPending();
     }
     dot.className='sync-dot live';
     hideLoading(); render();
@@ -838,10 +841,20 @@ function enterHole(id,idx,result){
 // ═══════════════════════════════════════════
 // PIN SYSTEM
 // ═══════════════════════════════════════════
-const SCORER_PIN = '6969';
-let pinUnlocked  = false;   // stays unlocked for the session once entered
-let pinBuffer    = '';
-let pinTarget    = null;    // match id waiting to be unlocked
+// PIN is hashed at startup so plaintext is not held in memory after load.
+// To change the PIN: update the string below and reload.
+// For stronger obscuring, precompute the hash in the browser console:
+//   crypto.subtle.digest('SHA-256',new TextEncoder().encode('YOUR_PIN')).then(b=>console.log(Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('')))
+// then set _pinRaw=null and _pinHash='<that hash>' to remove the plaintext from source entirely.
+let _pinRaw = '6969', _pinHash = null;
+crypto.subtle.digest('SHA-256', new TextEncoder().encode(_pinRaw))
+  .then(buf => { _pinHash = Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join(''); _pinRaw = null; });
+
+let pinUnlocked = false;
+let pinBuffer   = '';
+let pinTarget   = null;
+let pinAttempts = 0;
+let pinLocked   = false;
 
 function useMulligan(id,side){
   if(mulligans[id][side]>=2) return;
@@ -947,7 +960,7 @@ function togglePanel(id){
 }
 
 function pinKey(digit){
-  if(pinBuffer.length>=4) return;
+  if(pinLocked||pinBuffer.length>=4) return;
   pinBuffer+=digit;
   updatePinDots();
   if(pinBuffer.length===4) setTimeout(checkPin,120);
@@ -964,20 +977,28 @@ function pinCancel(){
   document.getElementById('pinOverlay').style.display='none';
 }
 
-function checkPin(){
-  if(pinBuffer===SCORER_PIN){
-    pinUnlocked=true;
+async function checkPin(){
+  if(pinLocked) return;
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pinBuffer));
+  const hex = Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  if(hex === _pinHash){
+    pinUnlocked=true; pinAttempts=0;
     document.getElementById('pinOverlay').style.display='none';
     if(pinTarget){ openPanels[pinTarget]=true; pinTarget=null; }
     render();
   } else {
-    // Flash error
+    pinAttempts++;
     document.querySelectorAll('.pin-dot').forEach(d=>d.classList.add('error'));
-    document.getElementById('pinError').textContent='Wrong PIN — try again';
+    if(pinAttempts>=5){
+      pinLocked=true;
+      document.getElementById('pinError').textContent='Too many attempts — locked for 30s';
+      setTimeout(()=>{ pinLocked=false; pinAttempts=0; document.getElementById('pinError').textContent=''; },30000);
+    } else {
+      document.getElementById('pinError').textContent=`Wrong PIN — ${5-pinAttempts} attempt${5-pinAttempts===1?'':'s'} left`;
+    }
     setTimeout(()=>{
       document.querySelectorAll('.pin-dot').forEach(d=>d.classList.remove('error'));
-      pinBuffer='';
-      updatePinDots();
+      pinBuffer=''; updatePinDots();
     },700);
   }
 }
