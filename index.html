@@ -407,9 +407,11 @@ async function saveMatch(id){
   const dot=document.getElementById('syncDot');
   dot.className='sync-dot';
   try{
+    // Save bonus first so that when the holes onValue fires it already sees the
+    // correct bonus data in Firebase, preventing a stale-read race condition.
+    await window._fbSet('tournament/bonus/'+id, bonusHoles[id]);
     await Promise.all([
       window._fbSet('tournament/holes/'+id,     holes[id]),
-      window._fbSet('tournament/bonus/'+id,     bonusHoles[id]),
       window._fbSet('tournament/mulligans/'+id, mulligans[id]),
     ]);
     dot.className='sync-dot live';
@@ -830,11 +832,10 @@ function toggleBonus(id,side){
 function enterHole(id,idx,result){
   holes[id][idx]=result;
   const pb=pending[id];
-  if(result!=='H'){
-    if(pb.a){ bonusHoles[id].a.push(idx); }
-    if(pb.b){ bonusHoles[id].b.push(idx); }
-  }
-  // Always clear pending after hole entered regardless of result
+  // Commit declared bonuses regardless of result — a declared bonus on a halved
+  // hole still consumes the slot even though it awards 0 points.
+  if(pb.a){ bonusHoles[id].a.push(idx); }
+  if(pb.b){ bonusHoles[id].b.push(idx); }
   pb.a=false; pb.b=false;
   savePending(id);
   saveMatch(id); render();
@@ -887,8 +888,8 @@ function openEditHole(matchId, holeIdx){
   const bBonus=bonusHoles[matchId].b.includes(holeIdx);
   const aUsed=bonusUsed(matchId,'a');
   const bUsed=bonusUsed(matchId,'b');
-  const aCanBonus = h===null ? (aBonus||(aUsed<MAX_BONUS)) : h==='A' ? (aBonus||(aUsed<MAX_BONUS)) : aBonus;
-  const bCanBonus = h===null ? (bBonus||(bUsed<MAX_BONUS)) : h==='B' ? (bBonus||(bUsed<MAX_BONUS)) : bBonus;
+  const aCanBonus=aBonus||(aUsed<MAX_BONUS);
+  const bCanBonus=bBonus||(bUsed<MAX_BONUS);
   const isNew=h===null;
   const cA=TEAMS.find(t=>t.id===m.teamA).color;
   const cB=TEAMS.find(t=>t.id===m.teamB).color;
@@ -922,10 +923,6 @@ function editSetResult(matchId, holeIdx, result){
   if(result==='H'){
     bonusHoles[matchId].a=bonusHoles[matchId].a.filter(x=>x!==holeIdx);
     bonusHoles[matchId].b=bonusHoles[matchId].b.filter(x=>x!==holeIdx);
-  } else if(result==='A'){
-    bonusHoles[matchId].b=bonusHoles[matchId].b.filter(x=>x!==holeIdx);
-  } else if(result==='B'){
-    bonusHoles[matchId].a=bonusHoles[matchId].a.filter(x=>x!==holeIdx);
   }
   saveMatch(matchId);
   openEditHole(matchId, holeIdx);
