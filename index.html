@@ -235,6 +235,9 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .edit-mu-btn{flex:1;padding:9px;border-radius:8px;border:1.5px solid var(--blue);background:transparent;color:var(--blue);font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s}
 .edit-mu-btn.on{background:var(--blue);color:var(--dark)}
 .edit-mu-btn:disabled{opacity:.3;cursor:default;border-color:var(--gray);color:var(--gray)}
+.edit-clear-btn{width:100%;padding:10px;background:transparent;border:1px solid rgba(217,79,58,.4);border-radius:8px;color:var(--red);font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;margin-bottom:12px;transition:all .15s}
+.edit-clear-btn:hover{background:rgba(217,79,58,.1)}
+.edit-clear-note{font-size:10px;color:var(--gray);text-align:center;padding:0 0 12px}
 .edit-close{width:100%;padding:12px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:10px;color:var(--white);font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
 
 /* PIN MODAL */
@@ -270,6 +273,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
     <div class="edit-hole-result" id="editResultRow"></div>
     <div class="edit-bonus-row" id="editBonusRow"></div>
     <div class="edit-bonus-row" id="editMuRow"></div>
+    <div id="editClearRow"></div>
     <button class="edit-close" onclick="closeEdit()">Done</button>
   </div>
 </div>
@@ -387,44 +391,50 @@ document.addEventListener('firebase-ready',()=>{
     if(_ready.holes&&_ready.bonus&&_ready.mulligans) hideLoading();
     render();
   }
+  // Firebase deletes nodes whose value is empty (e.g. {a:[],b:[]}), so a
+  // missing match key means "no data" — reset local state rather than keeping
+  // stale values, otherwise undos never propagate to other devices.
   window._fbListen('tournament/holes',(data)=>{
-    if(data){
-      ALL_MATCHES.forEach(m=>{
-        if(data[m.id]){
-          const s=data[m.id];
-          const arr=Array(18).fill(null);
-          if(Array.isArray(s)) s.forEach((v,i)=>arr[i]=v);
-          else Object.keys(s).forEach(k=>{const i=parseInt(k);if(i>=0&&i<18)arr[i]=s[k];});
-          holes[m.id]=arr;
-        }
-      });
-    }
+    data=data||{};
+    ALL_MATCHES.forEach(m=>{
+      if(data[m.id]){
+        const s=data[m.id];
+        const arr=Array(18).fill(null);
+        if(Array.isArray(s)) s.forEach((v,i)=>arr[i]=v);
+        else Object.keys(s).forEach(k=>{const i=parseInt(k);if(i>=0&&i<18)arr[i]=s[k];});
+        holes[m.id]=arr;
+      } else {
+        holes[m.id]=Array(18).fill(null);
+      }
+    });
     _ready.holes=true; _onSync();
   });
   window._fbListen('tournament/bonus',(data)=>{
-    if(data){
-      ALL_MATCHES.forEach(m=>{
-        if(data[m.id]){
-          const b=data[m.id];
-          bonusHoles[m.id]={
-            a:Array.isArray(b.a)?b.a:Object.values(b.a||{}),
-            b:Array.isArray(b.b)?b.b:Object.values(b.b||{})
-          };
-        }
-      });
-    }
+    data=data||{};
+    ALL_MATCHES.forEach(m=>{
+      if(data[m.id]){
+        const b=data[m.id];
+        bonusHoles[m.id]={
+          a:Array.isArray(b.a)?b.a:Object.values(b.a||{}),
+          b:Array.isArray(b.b)?b.b:Object.values(b.b||{})
+        };
+      } else {
+        bonusHoles[m.id]={a:[],b:[]};
+      }
+    });
     _ready.bonus=true; _onSync();
   });
   window._fbListen('tournament/mulligans',(data)=>{
-    if(data){
-      ALL_MATCHES.forEach(m=>{
-        if(data[m.id]){
-          const d=data[m.id];
-          const parseM=v=>Array.isArray(v)?v.filter(x=>x>=0&&x<18):typeof v==='object'&&v?Object.values(v).filter(x=>x>=0&&x<18):[];
-          mulligans[m.id]={a:parseM(d.a),b:parseM(d.b)};
-        }
-      });
-    }
+    data=data||{};
+    ALL_MATCHES.forEach(m=>{
+      if(data[m.id]){
+        const d=data[m.id];
+        const parseM=v=>Array.isArray(v)?v.filter(x=>x>=0&&x<18):typeof v==='object'&&v?Object.values(v).filter(x=>x>=0&&x<18):[];
+        mulligans[m.id]={a:parseM(d.a),b:parseM(d.b)};
+      } else {
+        mulligans[m.id]={a:[],b:[]};
+      }
+    });
     _ready.mulligans=true; _onSync();
   });
 });
@@ -716,11 +726,12 @@ function buildPanel(m,aUp,played,result,fmt,cA,cB){
   // Mulligan tracker
   const mu=mulligans[m.id];
   const amuLeft=MAX_MU-mu.a.length, bmuLeft=MAX_MU-mu.b.length;
+  const muDisA=mu.a.length>=MAX_MU||!!result, muDisB=mu.b.length>=MAX_MU||!!result;
   let mulliganHtml=`<div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
     <div style="flex:1;">
       <div style="font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:${cA};font-weight:600;margin-bottom:6px;">🔄 ${m.pairA}</div>
       <div style="display:flex;gap:6px;align-items:center;">
-        <button onclick="useMulligan('${m.id}','a')" ${mu.a.length>=MAX_MU?'disabled':''} style="padding:6px 10px;border-radius:6px;border:1.5px solid ${cA};background:transparent;color:${cA};font-size:11px;font-weight:600;cursor:pointer;${mu.a.length>=MAX_MU?'opacity:.3;cursor:default;':''}font-family:'DM Sans',sans-serif;">Use</button>
+        <button onclick="useMulligan('${m.id}','a')" ${muDisA?'disabled':''} style="padding:6px 10px;border-radius:6px;border:1.5px solid ${cA};background:transparent;color:${cA};font-size:11px;font-weight:600;cursor:pointer;${muDisA?'opacity:.3;cursor:default;':''}font-family:'DM Sans',sans-serif;">Use</button>
         <button onclick="undoMulligan('${m.id}','a')" ${mu.a.length<=0?'disabled':''} style="padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--gray);font-size:11px;cursor:pointer;${mu.a.length<=0?'opacity:.3;cursor:default;':''}font-family:'DM Sans',sans-serif;">↩</button>
         <span style="font-family:'DM Mono',monospace;font-size:11px;color:${amuLeft>0?cA:'var(--gray)'};">${amuLeft} left</span>
       </div>
@@ -731,7 +742,7 @@ function buildPanel(m,aUp,played,result,fmt,cA,cB){
       <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;">
         <span style="font-family:'DM Mono',monospace;font-size:11px;color:${bmuLeft>0?cB:'var(--gray)'};">${bmuLeft} left</span>
         <button onclick="undoMulligan('${m.id}','b')" ${mu.b.length<=0?'disabled':''} style="padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--gray);font-size:11px;cursor:pointer;${mu.b.length<=0?'opacity:.3;cursor:default;':''}font-family:'DM Sans',sans-serif;">↩</button>
-        <button onclick="useMulligan('${m.id}','b')" ${mu.b.length>=MAX_MU?'disabled':''} style="padding:6px 10px;border-radius:6px;border:1.5px solid ${cB};background:transparent;color:${cB};font-size:11px;font-weight:600;cursor:pointer;${mu.b.length>=MAX_MU?'opacity:.3;cursor:default;':''}font-family:'DM Sans',sans-serif;">Use</button>
+        <button onclick="useMulligan('${m.id}','b')" ${muDisB?'disabled':''} style="padding:6px 10px;border-radius:6px;border:1.5px solid ${cB};background:transparent;color:${cB};font-size:11px;font-weight:600;cursor:pointer;${muDisB?'opacity:.3;cursor:default;':''}font-family:'DM Sans',sans-serif;">Use</button>
       </div>
     </div>
   </div>`;
@@ -792,45 +803,123 @@ function buildPanel(m,aUp,played,result,fmt,cA,cB){
 // ═══════════════════════════════════════════
 // RENDER — STATS
 // ═══════════════════════════════════════════
+// Individual records — players are credited from whichever pair they're in
+// each day, so the same name accumulates across all three rounds.
+function getPlayerStats(){
+  const players={};
+  ALL_MATCHES.forEach(m=>{
+    const ensure=(n,team)=>{ if(!players[n]) players[n]={name:n,team,pts:0,w:0,l:0,h:0}; return players[n]; };
+    const aS=m.pairA.split('&').map(s=>ensure(s.trim(),m.teamA));
+    const bS=m.pairB.split('&').map(s=>ensure(s.trim(),m.teamB));
+    const {aUp,played,result}=calcMatch(m.id);
+    if(result){
+      if(result.winner==='A'){ aS.forEach(p=>{p.w++;p.pts+=result.margin;}); bS.forEach(p=>p.l++); }
+      else if(result.winner==='B'){ bS.forEach(p=>{p.w++;p.pts+=result.margin;}); aS.forEach(p=>p.l++); }
+      else aS.concat(bS).forEach(p=>p.h++);
+    } else if(played>0){
+      // In-progress — credit the live running score, same as team standings
+      if(aUp>0) aS.forEach(p=>p.pts+=aUp);
+      else if(aUp<0) bS.forEach(p=>p.pts+=-aUp);
+    }
+  });
+  return Object.values(players);
+}
+
+function getDayPoints(day){
+  const dpts={1:0,2:0,3:0,4:0};
+  day.matches.forEach(m=>{
+    const {aUp,played,result}=calcMatch(m.id);
+    if(result){
+      if(result.winner==='A') dpts[m.teamA]+=result.margin;
+      else if(result.winner==='B') dpts[m.teamB]+=result.margin;
+    } else if(played>0){
+      if(aUp>0) dpts[m.teamA]+=aUp;
+      else if(aUp<0) dpts[m.teamB]+=-aUp;
+    }
+  });
+  return dpts;
+}
+
+// Largest deficit the eventual winner faced at any point during the match
+function maxDeficitOvercome(id,winner){
+  const h=holes[id], ba=bonusHoles[id].a, bb=bonusHoles[id].b;
+  let aUp=0, worst=0;
+  for(let i=0;i<18;i++){
+    if(h[i]===null) break;
+    if(h[i]==='A') aUp+=ba.includes(i)?2:1;
+    else if(h[i]==='B') aUp-=bb.includes(i)?2:1;
+    const deficit=winner==='A'?-aUp:aUp;
+    if(deficit>worst) worst=deficit;
+  }
+  return worst;
+}
+
 function renderStats(){
-  const {pts,wins,loss,half}=getTeamStats();
-  const maxPts=Math.max(1,...Object.values(pts));
-  let totalPlayed=0,totalHoles=0,totalBonuses=0;
-  let bigWin=null,bigWinPts=0,closeMatch=null,closeMatchPts=99;
+  const {pts}=getTeamStats();
+  let totalPlayed=0;
+  let bigWin=null,bigWinPts=0,closeMatch=null,closeMatchPts=99,comeback=null,comebackDef=0;
   SCHEDULE.forEach(day=>day.matches.forEach(m=>{
-    const {played,result}=calcMatch(m.id);
-    totalHoles+=played;
-    totalBonuses+=bonusHoles[m.id].a.length+bonusHoles[m.id].b.length;
+    const {result}=calcMatch(m.id);
     if(!result) return;
     totalPlayed++;
     if(result.winner!=='H'){
       if(result.margin>bigWinPts){bigWinPts=result.margin;bigWin={m,result};}
       if(result.margin<closeMatchPts){closeMatchPts=result.margin;closeMatch={m,result};}
+      const def=maxDeficitOvercome(m.id,result.winner);
+      if(def>comebackDef){comebackDef=def;comeback={m,result};}
     }
   }));
+
   let html='<div style="padding-top:4px;">';
-  html+='<div class="sec-title">Tournament Progress</div>';
-  html+=`<div class="stat-row"><span class="stat-label">Matches Complete</span><span class="stat-val">${totalPlayed} / 12</span></div>`;
-  html+=`<div class="stat-row"><span class="stat-label">Holes Played</span><span class="stat-val">${totalHoles}</span></div>`;
-  html+=`<div class="stat-row"><span class="stat-label">Total Points Banked</span><span class="stat-val hi">${Object.values(pts).reduce((a,b)=>a+b,0)}</span></div>`;
-  html+=`<div class="stat-row"><span class="stat-label">🔥 Bonuses Used</span><span class="stat-val" style="color:var(--orange)">${totalBonuses} / ${ALL_MATCHES.length*MAX_BONUS*2}</span></div>`;
-  html+='<div class="sec-title">Highlights</div>';
+
+  // ── Player leaderboard ──
+  const sortedPlayers=getPlayerStats().sort((a,b)=>b.pts-a.pts||b.w-a.w||a.name.localeCompare(b.name));
+  const maxP=Math.max(1,...sortedPlayers.map(p=>p.pts));
+  html+='<div class="sec-title">Player Leaderboard</div>';
+  sortedPlayers.forEach((p,i)=>{
+    const t=TEAMS.find(x=>x.id===p.team);
+    html+=`<div class="bar-row">
+      <div class="bar-top">
+        <span class="bar-name"><span style="font-family:'DM Mono',monospace;font-size:10px;color:${i===0?'var(--gold)':'var(--gray)'};display:inline-block;width:20px;">${i+1}</span><span style="color:${t.color}">${p.name}</span></span>
+        <span class="bar-pts" style="color:${t.color}">${p.pts} pts</span>
+      </div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(p.pts/maxP)*100}%;background:${t.color};"></div></div>
+      <div class="bar-rec">${p.w}W · ${p.l}L · ${p.h}H · ${t.short}</div>
+    </div>`;
+  });
+
+  // ── Team points by day ──
+  const courseAbbr={'Deerhurst':'DEER','North Granite Ridge':'NGR','The Rock':'ROCK'};
+  const dayPts=SCHEDULE.map(d=>getDayPoints(d));
+  const dayBest=dayPts.map(dp=>Math.max(...Object.values(dp)));
+  html+='<div class="sec-title">Team Points by Day</div>';
+  html+=`<div style="display:grid;grid-template-columns:1.5fr repeat(4,1fr);gap:4px;align-items:center;margin-bottom:2px;">
+    <div></div>
+    ${SCHEDULE.map(d=>`<div style="text-align:center;font-size:9px;color:var(--gray);text-transform:uppercase;font-weight:600;">Day ${d.day}<br><span style="color:var(--gold);font-size:8px;font-family:'DM Mono',monospace;">${courseAbbr[d.course]||d.course}</span></div>`).join('')}
+    <div style="text-align:center;font-size:9px;color:var(--gold);text-transform:uppercase;font-weight:600;">Total</div>
+  </div>`;
+  [...TEAMS].sort((a,b)=>pts[b.id]-pts[a.id]).forEach(t=>{
+    html+=`<div style="display:grid;grid-template-columns:1.5fr repeat(4,1fr);gap:4px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);">
+      <div style="font-size:11px;font-weight:600;color:${t.color};display:flex;align-items:center;gap:5px;"><img src="${t.logo}" style="width:20px;height:20px;object-fit:contain;"/>${t.short}</div>
+      ${dayPts.map((dp,di)=>{
+        const v=dp[t.id], isBest=v>0&&v===dayBest[di];
+        return `<div style="text-align:center;font-family:'DM Mono',monospace;font-size:13px;color:${isBest?'var(--green-bright)':v>0?'var(--cream)':'var(--gray)'};font-weight:${isBest?'600':'400'};">${v}</div>`;
+      }).join('')}
+      <div style="text-align:center;font-family:'Bebas Neue',sans-serif;font-size:20px;color:${t.color};">${pts[t.id]}</div>
+    </div>`;
+  });
+  html+='<div style="font-size:9px;color:var(--gray);margin-top:6px;text-align:right;">Green = best team that day</div>';
+
+  // ── Match highlights ──
+  html+='<div class="sec-title">Match Highlights</div>';
+  html+=`<div class="stat-row"><span class="stat-label">Matches Complete</span><span class="stat-val">${totalPlayed} / ${ALL_MATCHES.length}</span></div>`;
   if(bigWin){const f=fmtResult(bigWin.result,bigWin.m.pairA,bigWin.m.pairB);html+=`<div class="stat-row"><span class="stat-label">Biggest Win</span><span class="stat-val hi">${f.text} — ${f.winner}</span></div>`;}
   else html+=`<div class="stat-row"><span class="stat-label">Biggest Win</span><span class="stat-val">—</span></div>`;
   if(closeMatch&&closeMatchPts<99){const f=fmtResult(closeMatch.result,closeMatch.m.pairA,closeMatch.m.pairB);html+=`<div class="stat-row"><span class="stat-label">Closest Match</span><span class="stat-val">${f.text} — ${f.winner}</span></div>`;}
   else html+=`<div class="stat-row"><span class="stat-label">Closest Match</span><span class="stat-val">—</span></div>`;
-  html+='<div class="sec-title">Points Breakdown</div>';
-  [...TEAMS].sort((a,b)=>pts[b.id]-pts[a.id]).forEach(t=>{
-    const pct=(pts[t.id]/maxPts)*100;
-    html+=`<div class="bar-row">
-      <div class="bar-top">
-        <span class="bar-name" style="color:${t.color};display:flex;align-items:center;gap:6px;"><img src="${t.logo}" style="width:24px;height:24px;object-fit:contain;"/>${t.short}</span>
-        <span class="bar-pts" style="color:${t.color}">${pts[t.id]} pts</span>
-      </div>
-      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${t.color};"></div></div>
-      <div class="bar-rec">${wins[t.id]}W · ${loss[t.id]}L · ${half[t.id]}H</div>
-    </div>`;
-  });
+  if(comeback&&comebackDef>0){const f=fmtResult(comeback.result,comeback.m.pairA,comeback.m.pairB);html+=`<div class="stat-row"><span class="stat-label">Biggest Comeback</span><span class="stat-val" style="color:var(--orange)">${comebackDef} down → won ${f.text} — ${f.winner}</span></div>`;}
+  else html+=`<div class="stat-row"><span class="stat-label">Biggest Comeback</span><span class="stat-val">—</span></div>`;
+
   html+='</div>';
   document.getElementById('stats').innerHTML=html;
 }
@@ -855,15 +944,21 @@ function toggleBonus(id,side){
   render();
 }
 
-function enterHole(id,idx,result){
-  holes[id][idx]=result;
+function commitPendingBonuses(id,idx){
   const pb=pending[id];
   // Commit declared bonuses regardless of result — a declared bonus on a halved
-  // hole still consumes the slot even though it awards 0 points.
-  if(pb.a){ bonusHoles[id].a.push(idx); }
-  if(pb.b){ bonusHoles[id].b.push(idx); }
+  // hole still consumes the slot even though it awards 0 points. Re-check the
+  // cap at commit time: edit mode or another device may have used slots since
+  // the bonus was declared.
+  if(pb.a&&bonusUsed(id,'a')<MAX_BONUS&&!bonusHoles[id].a.includes(idx)) bonusHoles[id].a.push(idx);
+  if(pb.b&&bonusUsed(id,'b')<MAX_BONUS&&!bonusHoles[id].b.includes(idx)) bonusHoles[id].b.push(idx);
   pb.a=false; pb.b=false;
   savePending(id);
+}
+
+function enterHole(id,idx,result){
+  holes[id][idx]=result;
+  commitPendingBonuses(id,idx);
   saveMatch(id); render();
 }
 
@@ -887,7 +982,8 @@ let pinAttempts = 0;
 let pinLocked   = false;
 
 function useMulligan(id,side){
-  if(mulligans[id][side].length>=2) return;
+  if(mulligans[id][side].length>=MAX_MU) return;
+  if(calcMatch(id).result) return; // match decided — no more mulligans
   const h=holes[id];
   let holeIdx=h.findIndex(x=>x===null);
   if(holeIdx<0) holeIdx=h.reduce((acc,v,i)=>v!==null?i:acc,-1);
@@ -951,13 +1047,38 @@ function openEditHole(matchId, holeIdx){
     </button>
   `;
 
+  // Clearing is only safe on the most recent entered hole — clearing a hole
+  // mid-match would leave a gap that orphans every hole after it.
+  const isLast=h!==null&&holes[matchId].slice(holeIdx+1).every(x=>x===null);
+  document.getElementById('editClearRow').innerHTML=
+    h===null?'':
+    isLast?`<button class="edit-clear-btn" onclick="editClearHole('${matchId}',${holeIdx})">⌫ Clear Hole ${holeIdx+1} — mark as not played</button>`:
+    `<div class="edit-clear-note">Only the most recent hole can be cleared</div>`;
+
   document.getElementById('editOverlay').dataset.matchId=matchId;
   document.getElementById('editOverlay').dataset.holeIdx=holeIdx;
   document.getElementById('editOverlay').style.display='flex';
 }
 
+function editClearHole(matchId, holeIdx){
+  if(holes[matchId][holeIdx]===null) return;
+  if(holes[matchId].slice(holeIdx+1).some(x=>x!==null)) return;
+  holes[matchId][holeIdx]=null;
+  // Refund any bonus committed on this hole — it no longer counts. Mulligans
+  // stay (they were used during play) and can be undone separately.
+  bonusHoles[matchId].a=bonusHoles[matchId].a.filter(x=>x!==holeIdx);
+  bonusHoles[matchId].b=bonusHoles[matchId].b.filter(x=>x!==holeIdx);
+  saveMatch(matchId);
+  closeEdit();
+  render();
+}
+
 function editSetResult(matchId, holeIdx, result){
+  const wasNew=holes[matchId][holeIdx]===null;
   holes[matchId][holeIdx]=result;
+  // Entering the next hole through the edit modal must consume pending
+  // bonuses the same way the main entry buttons do.
+  if(wasNew) commitPendingBonuses(matchId, holeIdx);
   saveMatch(matchId);
   openEditHole(matchId, holeIdx);
   render();
@@ -969,9 +1090,9 @@ function editToggleBonus(matchId, holeIdx, side){
   const used=bonusUsed(matchId,side);
   if(!hasBonus && used>=MAX_BONUS) return; // no bonus left
   if(hasBonus){
-    bonusHoles[matchId][side]=arr.filter(x=>x!==holeIdx);
+    arr.splice(arr.indexOf(holeIdx),1); // remove one entry only, in case of duplicates
   } else {
-    bonusHoles[matchId][side].push(holeIdx);
+    arr.push(holeIdx);
   }
   saveMatch(matchId);
   openEditHole(matchId, holeIdx);
@@ -982,7 +1103,11 @@ function editToggleMulligan(matchId, holeIdx, side){
   const arr=mulligans[matchId][side];
   const hasMu=arr.includes(holeIdx);
   if(!hasMu && arr.length>=MAX_MU) return;
-  mulligans[matchId][side]=hasMu?arr.filter(x=>x!==holeIdx):[...arr,holeIdx];
+  if(hasMu){
+    arr.splice(arr.indexOf(holeIdx),1); // remove one entry only — both mulligans may be on the same hole
+  } else {
+    arr.push(holeIdx);
+  }
   saveMatch(matchId);
   openEditHole(matchId, holeIdx);
   render();
