@@ -211,6 +211,19 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .bar-fill{height:100%;background:linear-gradient(90deg,var(--green-light),var(--green-bright));border-radius:4px;transition:width .6s ease}
 .bar-rec{font-size:10px;color:var(--gray);margin-top:3px;font-family:'DM Mono',monospace}
 
+/* RULES */
+.rules-section{font-size:13px;line-height:1.65;color:var(--cream)}
+.rules-block{background:var(--gray-light);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:12px}
+.rules-block-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1.5px;color:var(--gold);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid rgba(232,196,74,.2)}
+.rules-block ul{list-style:none;padding:0;margin:0}
+.rules-block li{padding:5px 0 5px 18px;position:relative;color:var(--cream);border-bottom:1px solid rgba(255,255,255,.04)}
+.rules-block li:last-child{border-bottom:none}
+.rules-block li::before{content:'•';position:absolute;left:0;color:var(--green-bright);font-size:14px;line-height:1.65}
+.rules-block li strong{color:var(--white)}
+.rules-block li em{color:var(--orange);font-style:normal}
+.rules-example{background:rgba(232,196,74,.05);border-left:2px solid var(--gold-dim);border-radius:0 6px 6px 0;padding:8px 12px;margin:8px 0;font-size:11px;color:var(--gray);font-family:'DM Mono',monospace}
+.rules-example strong{color:var(--gold)}
+
 /* LOADING */
 .loading-screen{position:fixed;inset:0;background:var(--green-dark);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:16px}
 .loading-logo{font-family:'Bebas Neue',sans-serif;font-size:48px;color:var(--gold);letter-spacing:3px}
@@ -319,10 +332,12 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
     <button class="nav-btn active" onclick="showSection('leaderboard')">Standings</button>
     <button class="nav-btn" onclick="showSection('scoring')">Scoring</button>
     <button class="nav-btn" onclick="showSection('stats')">Stats</button>
+    <button class="nav-btn" onclick="showSection('rules')">Rules</button>
   </div>
   <div id="leaderboard" class="section active"></div>
   <div id="scoring"     class="section"></div>
   <div id="stats"       class="section"></div>
+  <div id="rules"       class="section"></div>
 </div>
 
 <script>
@@ -356,8 +371,7 @@ const SCHEDULE = [
   ]},
 ];
 const ALL_MATCHES = SCHEDULE.flatMap(d=>d.matches);
-const MAX_BONUS = 2;
-const MAX_MU    = 2;
+const SEG_MAX = 1; // 1 bonus ball and 1 reverse mulligan per team per 9 holes
 
 // ═══════════════════════════════════════════
 // STATE
@@ -485,9 +499,8 @@ function calcMatch(id){
     else if(h[i]==='B') aUp-=bv;
     // halved = 0, no points
     const rem=18-played;
-    const maxRemA=rem*2, maxRemB=rem*2;
-    if(aUp>maxRemB){ result={winner:'A',margin:aUp, close:played,rem}; break; }
-    if(-aUp>maxRemA){ result={winner:'B',margin:-aUp,close:played,rem}; break; }
+    if(aUp>rem){ result={winner:'A',margin:aUp, close:played,rem}; break; }
+    if(-aUp>rem){ result={winner:'B',margin:-aUp,close:played,rem}; break; }
   }
   if(!result&&played===18){
     if(aUp>0)      result={winner:'A',margin:aUp, close:18,rem:0};
@@ -506,6 +519,8 @@ function fmtResult(result,pairA,pairB){
 }
 
 function bonusUsed(id,side){ return bonusHoles[id][side].length; }
+function bonusUsedInSeg(id,side,seg){ return bonusHoles[id][side].filter(i=>(i<9?0:1)===seg).length; }
+function muUsedInSeg(id,side,seg){ return mulligans[id][side].filter(i=>(i<9?0:1)===seg).length; }
 
 function getTeamStats(){
   const pts={1:0,2:0,3:0,4:0},wins={1:0,2:0,3:0,4:0},loss={1:0,2:0,3:0,4:0},half={1:0,2:0,3:0,4:0};
@@ -705,28 +720,30 @@ function buildPanel(m,aUp,played,result,fmt,cA,cB){
   // Bonus declaration row
   let bonusHtml='';
   if(!result&&next>=0){
-    const aUsed=bonusUsed(m.id,'a'), bUsed=bonusUsed(m.id,'b');
-    const aDis=(MAX_BONUS-aUsed-(pb.a?1:0)<=0&&!pb.a)?'disabled':'';
-    const bDis=(MAX_BONUS-bUsed-(pb.b?1:0)<=0&&!pb.b)?'disabled':'';
+    const seg=next<9?0:1;
+    const aUsed=bonusUsedInSeg(m.id,'a',seg), bUsed=bonusUsedInSeg(m.id,'b',seg);
+    const aDis=(SEG_MAX-aUsed-(pb.a?1:0)<=0&&!pb.a)?'disabled':'';
+    const bDis=(SEG_MAX-bUsed-(pb.b?1:0)<=0&&!pb.b)?'disabled':'';
     bonusHtml=`<div class="bonus-row">
       <div class="bonus-side">
         <div class="bonus-label" style="color:${cA}">🔥 ${m.pairA}</div>
         <button class="bonus-btn ${pb.a?'on':''}" style="border-color:${cA};color:${pb.a?'var(--dark)':cA};${pb.a?`background:${cA}`:''};" ${aDis} onclick="toggleBonus('${m.id}','a')">${pb.a?'✓ Bonus On':'+ Bonus'}</button>
-        <div class="bonus-left">${MAX_BONUS-aUsed-(pb.a?1:0)} remaining</div>
+        <div class="bonus-left">${SEG_MAX-aUsed-(pb.a?1:0)} remaining this 9</div>
       </div>
       <div class="bonus-divider"></div>
       <div class="bonus-side" style="text-align:right">
         <div class="bonus-label" style="text-align:right;color:${cB}">🔥 ${m.pairB}</div>
         <button class="bonus-btn ${pb.b?'on':''}" style="border-color:${cB};color:${pb.b?'var(--dark)':cB};${pb.b?`background:${cB}`:''};" ${bDis} onclick="toggleBonus('${m.id}','b')">${pb.b?'✓ Bonus On':'+ Bonus'}</button>
-        <div class="bonus-left">${MAX_BONUS-bUsed-(pb.b?1:0)} remaining</div>
+        <div class="bonus-left">${SEG_MAX-bUsed-(pb.b?1:0)} remaining this 9</div>
       </div>
     </div>`;
   }
 
   // Mulligan tracker
   const mu=mulligans[m.id];
-  const amuLeft=MAX_MU-mu.a.length, bmuLeft=MAX_MU-mu.b.length;
-  const muDisA=mu.a.length>=MAX_MU||!!result, muDisB=mu.b.length>=MAX_MU||!!result;
+  const muSeg=next>=0?(next<9?0:1):(played>9?1:0);
+  const amuLeft=SEG_MAX-muUsedInSeg(m.id,'a',muSeg), bmuLeft=SEG_MAX-muUsedInSeg(m.id,'b',muSeg);
+  const muDisA=muUsedInSeg(m.id,'a',muSeg)>=SEG_MAX||!!result, muDisB=muUsedInSeg(m.id,'b',muSeg)>=SEG_MAX||!!result;
   let mulliganHtml=`<div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;">
     <div style="flex:1;">
       <div style="font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:${cA};font-weight:600;margin-bottom:6px;">🔄 ${m.pairA}</div>
@@ -938,7 +955,11 @@ function loadAllPending(){
 
 function toggleBonus(id,side){
   const pb=pending[id];
-  if(!pb[side]&&bonusUsed(id,side)>=MAX_BONUS) return;
+  const h=holes[id];
+  const nxt=h.findIndex(x=>x===null);
+  if(nxt<0) return;
+  const seg=nxt<9?0:1;
+  if(!pb[side]&&bonusUsedInSeg(id,side,seg)>=SEG_MAX) return;
   pb[side]=!pb[side];
   savePending(id);
   render();
@@ -950,8 +971,9 @@ function commitPendingBonuses(id,idx){
   // hole still consumes the slot even though it awards 0 points. Re-check the
   // cap at commit time: edit mode or another device may have used slots since
   // the bonus was declared.
-  if(pb.a&&bonusUsed(id,'a')<MAX_BONUS&&!bonusHoles[id].a.includes(idx)) bonusHoles[id].a.push(idx);
-  if(pb.b&&bonusUsed(id,'b')<MAX_BONUS&&!bonusHoles[id].b.includes(idx)) bonusHoles[id].b.push(idx);
+  const seg=idx<9?0:1;
+  if(pb.a&&bonusUsedInSeg(id,'a',seg)<SEG_MAX&&!bonusHoles[id].a.includes(idx)) bonusHoles[id].a.push(idx);
+  if(pb.b&&bonusUsedInSeg(id,'b',seg)<SEG_MAX&&!bonusHoles[id].b.includes(idx)) bonusHoles[id].b.push(idx);
   pb.a=false; pb.b=false;
   savePending(id);
 }
@@ -982,12 +1004,13 @@ let pinAttempts = 0;
 let pinLocked   = false;
 
 function useMulligan(id,side){
-  if(mulligans[id][side].length>=MAX_MU) return;
   if(calcMatch(id).result) return; // match decided — no more mulligans
   const h=holes[id];
   let holeIdx=h.findIndex(x=>x===null);
   if(holeIdx<0) holeIdx=h.reduce((acc,v,i)=>v!==null?i:acc,-1);
   if(holeIdx<0) return;
+  const seg=holeIdx<9?0:1;
+  if(muUsedInSeg(id,side,seg)>=SEG_MAX) return;
   mulligans[id][side].push(holeIdx);
   saveMatch(id); render();
 }
@@ -1008,14 +1031,15 @@ function openEditHole(matchId, holeIdx){
   const h=holes[matchId][holeIdx];
   const aBonus=bonusHoles[matchId].a.includes(holeIdx);
   const bBonus=bonusHoles[matchId].b.includes(holeIdx);
-  const aUsed=bonusUsed(matchId,'a');
-  const bUsed=bonusUsed(matchId,'b');
-  const aCanBonus=aBonus||(aUsed<MAX_BONUS);
-  const bCanBonus=bBonus||(bUsed<MAX_BONUS);
+  const eSeg=holeIdx<9?0:1;
+  const aUsed=bonusUsedInSeg(matchId,'a',eSeg);
+  const bUsed=bonusUsedInSeg(matchId,'b',eSeg);
+  const aCanBonus=aBonus||(aUsed<SEG_MAX);
+  const bCanBonus=bBonus||(bUsed<SEG_MAX);
   const aMu=mulligans[matchId].a.includes(holeIdx);
   const bMu=mulligans[matchId].b.includes(holeIdx);
-  const aCanMu=aMu||(mulligans[matchId].a.length<MAX_MU);
-  const bCanMu=bMu||(mulligans[matchId].b.length<MAX_MU);
+  const aCanMu=aMu||(muUsedInSeg(matchId,'a',eSeg)<SEG_MAX);
+  const bCanMu=bMu||(muUsedInSeg(matchId,'b',eSeg)<SEG_MAX);
   const isNew=h===null;
   const cA=TEAMS.find(t=>t.id===m.teamA).color;
   const cB=TEAMS.find(t=>t.id===m.teamB).color;
@@ -1087,8 +1111,9 @@ function editSetResult(matchId, holeIdx, result){
 function editToggleBonus(matchId, holeIdx, side){
   const arr=bonusHoles[matchId][side];
   const hasBonus=arr.includes(holeIdx);
-  const used=bonusUsed(matchId,side);
-  if(!hasBonus && used>=MAX_BONUS) return; // no bonus left
+  const eSeg=holeIdx<9?0:1;
+  const used=bonusUsedInSeg(matchId,side,eSeg);
+  if(!hasBonus && used>=SEG_MAX) return; // no bonus left this 9
   if(hasBonus){
     arr.splice(arr.indexOf(holeIdx),1); // remove one entry only, in case of duplicates
   } else {
@@ -1102,7 +1127,8 @@ function editToggleBonus(matchId, holeIdx, side){
 function editToggleMulligan(matchId, holeIdx, side){
   const arr=mulligans[matchId][side];
   const hasMu=arr.includes(holeIdx);
-  if(!hasMu && arr.length>=MAX_MU) return;
+  const eSeg=holeIdx<9?0:1;
+  if(!hasMu && muUsedInSeg(matchId,side,eSeg)>=SEG_MAX) return;
   if(hasMu){
     arr.splice(arr.indexOf(holeIdx),1); // remove one entry only — both mulligans may be on the same hole
   } else {
@@ -1190,10 +1216,66 @@ function showSection(name){
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById(name).classList.add('active');
-  document.querySelectorAll('.nav-btn')[['leaderboard','scoring','stats'].indexOf(name)].classList.add('active');
+  document.querySelectorAll('.nav-btn')[['leaderboard','scoring','stats','rules'].indexOf(name)].classList.add('active');
   render();
 }
-function render(){ renderLeaderboard(); renderScoring(); renderStats(); }
+function render(){ renderLeaderboard(); renderScoring(); renderStats(); renderRules(); }
+
+function renderRules(){
+  const el=document.getElementById('rules');
+  if(!el) return;
+  el.innerHTML=`<div class="rules-section">
+    <div class="sec-title">Playing Rules</div>
+
+    <div class="rules-block">
+      <div class="rules-block-title">Playing Rules</div>
+      <ul>
+        <li><strong>Two man scramble format.</strong></li>
+        <li>Both players tee off and select the best shot/ball where they would like to hit their 2nd shots.</li>
+        <li>Both players hit from the selected spot. The shot must be hit from <em>within one club length</em> of the selected ball, <strong>no closer to the hole</strong>.</li>
+        <li>The chosen ball condition must be maintained for the shot (i.e. bunker, rough, penalty area, or fringe).</li>
+        <li>On the green, both players must putt from <em>within one putter head</em> (no closer to the hole) where the selected ball was marked.</li>
+      </ul>
+    </div>
+
+    <div class="rules-block">
+      <div class="rules-block-title">Reverse Mulligan</div>
+      <ul>
+        <li>Each team has <em>one (1) reverse mulligan</em> per 9 holes. It forces one player on the <strong>other team</strong> to re-hit their shot.</li>
+        <li>The reverse mulligan must be utilized <strong>immediately</strong> after the shot has occurred.</li>
+        <li>A reverse mulligan may <strong>NOT</strong> be used on any shot that utilizes a putter.</li>
+        <li>A reverse mulligan may <strong>not be carried over</strong> from the Front 9 to the Back 9. If unused on the Front 9, it is lost.</li>
+      </ul>
+    </div>
+
+    <div class="rules-block">
+      <div class="rules-block-title">Double Up Power Ball</div>
+      <ul>
+        <li>Each team has <em>one (1) Double Up Power Ball</em> per 9 holes.</li>
+        <li>Teams must announce use of the Power Ball <strong>on the tee block</strong> before any shot is taken.</li>
+        <li>The Power Ball <strong>doubles the value</strong> of the hole for the team using it. The opposing team's hole value is unchanged.</li>
+        <li>Both teams may use the Power Ball on the same hole.</li>
+        <li>The Power Ball may <strong>not be carried over</strong> from the Front 9 to the Back 9. If unused, it is lost.</li>
+      </ul>
+      <div class="rules-example"><strong>Example 1:</strong> Team uses Power Ball, they are 1 DOWN. They win the hole → now 1 UP.</div>
+      <div class="rules-example"><strong>Example 2:</strong> Team uses Power Ball, they are 2 UP. They lose the hole → now 1 UP.</div>
+    </div>
+
+    <div class="rules-block">
+      <div class="rules-block-title">Scoring Rules</div>
+      <ul>
+        <li><strong>Match play</strong> scoring format.</li>
+        <li>Lowest two man scramble score on each hole <strong>wins the hole</strong>.</li>
+        <li>There are <strong>no carry over holes</strong>. If both teams tie a hole, the score remains the same.</li>
+        <li>Scoring is stopped once a team is <em>up by more holes than remain</em>.</li>
+        <li>The winning team is awarded the number of holes they are UP after the match is decided.</li>
+        <li>The team with the <strong>most cumulative points</strong> at the end of the tournament wins the Birdie Juice Cup.</li>
+      </ul>
+      <div class="rules-example"><strong>Example 1:</strong> Team is 4 UP with 3 holes to play → match closed, team earns 4 pts.</div>
+      <div class="rules-example"><strong>Example 2:</strong> Team is 2 UP with 1 hole to play → match closed, team earns 2 pts.</div>
+    </div>
+  </div>`;
+}
 </script>
 </body>
 </html>
